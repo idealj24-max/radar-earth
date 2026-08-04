@@ -3,951 +3,567 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PCD 2.0 SNIM - Industrial Command Center</title>
+  <title>PCD 2.0 SNIM - Poste de Commandement Digital</title>
   
-  <!-- Manifeste PWA embarqué -->
-  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;&#125;">
-
-  <!-- Leaflet CSS & JS -->
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- Client Backend Supabase (Temps Réel & Sync Cloud) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 
   <style>
+    :root {
+      --bg-dark: #0b131e;
+      --card-bg: rgba(15, 23, 42, 0.92);
+      --card-border: #1e293b;
+      --accent-blue: #0284c7;
+      --accent-gold: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-green: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
     * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Roboto', sans-serif;
       user-select: none;
     }
 
-    html, body, #map {
+    body, html {
       width: 100%;
       height: 100%;
-      background: #090d16;
       overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
     }
 
-    .leaflet-control-attribution {
-      display: none !important;
-    }
-
-    .night-mode {
-      filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%);
-    }
-
-    /* BANDEAU SUPÉRIEUR TACTIQUE */
-    .top-panel {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(245, 158, 11, 0.5);
-      padding: 10px 12px;
-      border-radius: 12px;
-      color: white;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
-    }
-
-    .top-panel.alert-active {
-      animation: alertFlash 0.8s infinite alternate;
-    }
-
-    @keyframes alertFlash {
-      from { background: rgba(220, 38, 38, 0.95); border-color: #ef4444; box-shadow: 0 0 25px rgba(239, 68, 68, 0.9); }
-      to { background: rgba(15, 23, 42, 0.95); border-color: rgba(245, 158, 11, 0.5); }
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: bold;
-      color: #f59e0b;
-      font-size: 13px;
-    }
-
-    .pulse {
-      width: 8px;
-      height: 8px;
-      background: #10b981;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #10b981;
-      animation: blink 1.2s infinite;
-    }
-
-    .user-badge {
-      background: #1e293b;
-      border: 1px solid #38bdf8;
-      color: #38bdf8;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 10px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      background: #334155;
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 11px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .btn-active { background: #d97706 !important; }
-    .btn-report { background: #dc2626 !important; border-color: #f87171 !important; }
-
-    /* PANNEAU LATÉRAL ET BOUTON FLOTTANT */
-    .side-panel {
-      position: fixed;
-      bottom: 25px;
-      left: 10px;
-      z-index: 1000;
-      width: 320px;
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      border-radius: 12px;
-      color: white;
-      padding: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-
-    .side-panel.collapsed {
-      transform: translateX(-340px);
-    }
-
-    .side-toggle-btn {
-      position: fixed;
-      left: 10px;
-      bottom: 25px;
-      z-index: 1001;
-      background: #0f172a;
-      border: 1px solid rgba(56, 189, 248, 0.6);
-      color: white;
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .side-panel:not(.collapsed) + .side-toggle-btn {
-      left: 340px;
-    }
-
-    .panel-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 6px;
-    }
-
-    .tab-btn {
-      flex: 1;
-      background: #1e293b;
-      border: none;
-      color: #94a3b8;
-      padding: 6px;
-      font-size: 10px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .tab-btn.active {
-      background: #0284c7;
-      color: white;
-    }
-
-    .telemetry-section {
-      margin-top: 10px;
-      padding-top: 6px;
-      border-top: 1px dashed rgba(255,255,255,0.2);
-    }
-
-    .telemetry-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      color: #f59e0b;
-      margin-bottom: 4px;
-      font-weight: bold;
-    }
-
-    .telemetry-item {
-      font-size: 11px;
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 3px;
-    }
-
-    .telemetry-value {
-      font-weight: bold;
-      color: #38bdf8;
-    }
-
-    .pk-badge {
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid #f59e0b;
-      color: #f59e0b;
-      font-size: 10px;
-      font-weight: bold;
-      padding: 3px 6px;
-      border-radius: 6px;
-      white-space: nowrap;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.9);
-    }
-
-    /* MODALES DE CONNEXION ET SIGNALEMENT */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(6px);
-      z-index: 2000;
-      align-items: center;
-      justify-content: center;
-      padding: 15px;
-    }
-
-    .modal-card {
-      background: #0f172a;
-      border: 1px solid #f59e0b;
-      border-radius: 12px;
+    /* MAP BACKGROUND */
+    #map {
       width: 100%;
-      max-width: 400px;
-      color: white;
-      padding: 18px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+      height: 100vh;
+      z-index: 1;
+      transition: filter 0.3s ease;
     }
 
-    .modal-title {
-      font-size: 14px;
-      color: #f59e0b;
-      font-weight: bold;
+    /* AUTH LOCK SCREEN OVERLAY */
+    .auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(7, 11, 18, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 9999;
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 12px;
+      justify-content: center;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .auth-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .auth-card {
+      width: 90%;
+      max-width: 420px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 20px rgba(2, 132, 199, 0.2);
+      padding: 24px;
+      animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .auth-header i {
+      font-size: 2.5rem;
+      color: var(--accent-gold);
+      margin-bottom: 10px;
+    }
+
+    .auth-header h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.25rem;
+      letter-spacing: 1px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
+    .auth-header p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
 
     .form-group {
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
 
     .form-group label {
       display: block;
-      font-size: 11px;
-      color: #94a3b8;
-      margin-bottom: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
     }
 
-    .form-group select, .form-group input, .form-group textarea {
+    .form-control {
       width: 100%;
       background: #1e293b;
       border: 1px solid #334155;
-      color: white;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 12px;
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
     }
 
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 14px;
+    .form-control:focus {
+      border-color: var(--accent-blue);
     }
 
     .btn-submit {
-      flex: 1;
-      background: #dc2626;
-      color: white;
+      width: 100%;
+      background: var(--accent-blue);
+      color: #fff;
       border: none;
-      padding: 10px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .btn-cancel {
-      background: #334155;
-      color: white;
-      border: none;
-      padding: 10px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    /* TOAST SYSTEM */
-    .toast-notification {
-      position: fixed;
-      top: 75px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-20px);
-      background: #10b981;
-      color: white;
-      padding: 10px 16px;
       border-radius: 8px;
-      font-size: 12px;
-      font-weight: bold;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      z-index: 3000;
-      opacity: 0;
-      pointer-events: none;
-      transition: all 0.3s ease;
+      padding: 14px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+      transition: background 0.2s, transform 0.1s;
     }
 
-    .toast-notification.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
+    .btn-submit:active {
+      transform: scale(0.98);
     }
 
-    .stat-bar-container {
+    .btn-logout {
+      width: 100%;
+      background: #334155;
+      color: var(--accent-red);
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 10px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+
+    /* TOP BAR & CONTROL PANELS */
+    .top-bar {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: 92%;
+      max-width: 600px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .app-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    .agent-badge {
+      background: rgba(2, 132, 199, 0.2);
+      border: 1px solid var(--accent-blue);
+      color: #38bdf8;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .nav-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .nav-btn {
       background: #1e293b;
-      height: 8px;
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 3px 0 8px 0;
+      border: 1px solid #334155;
+      color: #fff;
+      padding: 8px 4px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-transform: uppercase;
     }
 
-    .stat-bar-fill {
-      height: 100%;
-      background: #f59e0b;
+    .nav-btn.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
     }
 
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .nav-btn.warning {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-gold);
+      color: #fcd34d;
+    }
+
+    /* DASHBOARD PANEL */
+    .dashboard-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: 92%;
+      max-width: 600px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      max-height: 45vh;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      color: var(--accent-gold);
+      border-bottom: 1px solid #334155;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .data-item {
+      background: rgba(30, 41, 59, 0.5);
+      padding: 10px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent-blue);
+    }
+
+    .data-item.alert {
+      border-left-color: var(--accent-red);
+    }
+
+    .data-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .data-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* TOAST NOTIFICATIONS */
+    .toast-container {
+      position: fixed;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--accent-green);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      animation: fadeInOut 3s forwards;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(-10px); }
+      15% { opacity: 1; transform: translateY(0); }
+      85% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Toast de notification -->
-  <div class="toast-notification" id="toast">✅ Notification Système SNIM</div>
-
-  <!-- BANDEAU HAUT -->
-  <div class="top-panel" id="topPanel">
-    <div class="brand">
-      <div class="pulse"></div>
-      <span id="panelTitle">PCD 2.0 SNIM</span>
-      <span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
-    </div>
-    <div class="controls">
-      <button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
-      <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
-      <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
-      <button class="btn" id="btnHeatmap" onclick="toggleHeatmap()">🛠️ MAINTENANCE</button>
-      <button class="btn" id="btnGPSReal" onclick="toggleGPSReal()">🛰️ GPS RÉEL</button>
-      <button class="btn" onclick="openAuthModal()">🔑 AGENT</button>
-    </div>
-  </div>
-
-  <!-- PANNEAU TÉLÉMÉTRIQUE SIDE -->
-  <div class="side-panel" id="sidePanel">
-    <div class="panel-tabs">
-      <button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">📡 TEMPS RÉEL</button>
-      <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 ANALYTICS & PK</button>
-    </div>
-    
-    <!-- VUE 1 : TEMPS RÉEL -->
-    <div id="tabLive">
-      <h4 style="color:#f59e0b; font-size:12px; margin-bottom:8px;">POSTE DE COMMANDEMENT SNIM</h4>
+  <!-- AUTH LOCK OVERLAY (Visible au démarrage par défaut) -->
+  <div id="authModal" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <i class="fa-solid fa-key"></i>
+        <h2>AUTHENTIFICATION AGENT SNIM</h2>
+        <p>Poste de Commandement Digital (PCD 2.0)</p>
+      </div>
       
-      <div class="telemetry-section">
-        <div class="telemetry-title">🚂 FLOTTE & CAPTEURS IoT</div>
-        <div class="telemetry-item"><span>Mode Position :</span><span class="telemetry-value" id="tTrackMode">Simulation Balises</span></div>
-        <div class="telemetry-item"><span>Vitesse Moyenne :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
-        <div class="telemetry-item"><span>Tonnage Minéralier :</span><span class="telemetry-value">21 500 T (Fer)</span></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">📉 ÉNERGIE & CARBURANT</div>
-        <div class="telemetry-item"><span>Conso Estimée :</span><span class="telemetry-value" style="color:#10b981;">14.2 L/km</span></div>
-        <div class="telemetry-item"><span>Optimisation Conduite :</span><span class="telemetry-value" style="color:#10b981;">+8.5% Économie</span></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">🚨 SÉCURITÉ & FREINAGE</div>
-        <div class="telemetry-item"><span>Distance d'arrêt min :</span><span class="telemetry-value" style="color:#ef4444;">1 850 mètres</span></div>
-        <div class="telemetry-item"><span>Cercle Protection :</span><span class="telemetry-value">ACTIF (2.0 km)</span></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">🌡️ MÉTÉO DES RAILS</div>
-        <div class="telemetry-item"><span>Température Sol :</span><span class="telemetry-value" id="tRailTemp">48°C</span></div>
-        <div class="telemetry-item"><span>Flambement Rails :</span><span class="telemetry-value" id="tDilatation" style="color:#10b981;">MODÉRÉ</span></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">📡 RACCORDEMENT CLOUD & SYNC</div>
-        <div class="telemetry-item"><span>Statut Réseau :</span><span class="telemetry-value" id="netStatus" style="color:#10b981;">En Ligne</span></div>
-        <div class="telemetry-item"><span>File d'attente Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
-      </div>
-    </div>
-
-    <!-- VUE 2 : ANALYTICS & HISTORIQUE INCIDENTS -->
-    <div id="tabStats" style="display: none;">
-      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE SYNCHRONISÉ (CLOUD)</h4>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">⚠️ REPARTITION DES ALERTES</div>
-        <div class="telemetry-item"><span>Ensablement Voie :</span><span class="telemetry-value">62%</span></div>
-        <div class="stat-bar-container"><div class="stat-bar-fill" style="width: 62%; background: #ea580c;"></div></div>
-
-        <div class="telemetry-item"><span>Obstacle Animal :</span><span class="telemetry-value">24%</span></div>
-        <div class="stat-bar-container"><div class="stat-bar-fill" style="width: 24%; background: #f59e0b;"></div></div>
-
-        <div class="telemetry-item"><span>Surchauffe Rails (>50°C) :</span><span class="telemetry-value">14%</span></div>
-        <div class="stat-bar-container"><div class="stat-bar-fill" style="width: 14%; background: #ef4444;"></div></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">📍 SECTEURS IMPACTÉS</div>
-        <div class="telemetry-item"><span>PK 460 (Passe de Choum) :</span><span class="telemetry-value" style="color:#ef4444;">18 Incidents</span></div>
-        <div class="telemetry-item"><span>PK 200 (Ben Amira) :</span><span class="telemetry-value" style="color:#f59e0b;">9 Incidents</span></div>
-        <div class="telemetry-item"><span>PK 650 (F'Dérik) :</span><span class="telemetry-value" style="color:#10b981;">3 Incidents</span></div>
-      </div>
-
-      <div class="telemetry-section">
-        <div class="telemetry-title">📢 SIGNALEMENTS DIRECTS (LIVE)</div>
-        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1;"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
-
-  <!-- MODAL 1: AUTHENTIFICATION AGENT SNIM -->
-  <div class="modal-overlay" id="authModal">
-    <div class="modal-card">
-      <div class="modal-title">🔑 AUTHENTIFICATION AGENT SNIM</div>
-      <form onsubmit="handleAuth(event)">
+      <form id="authForm" onsubmit="handleAuthSubmit(event)">
         <div class="form-group">
-          <label>Matricule Agent SNIM :</label>
-          <input type="text" id="authMatricule" placeholder="Ex: AG-8492" required />
+          <label for="agentMatricule">Matricule Agent SNIM :</label>
+          <input type="text" id="agentMatricule" class="form-control" placeholder="Ex: AG-8492" required autocomplete="off">
         </div>
+
         <div class="form-group">
-          <label>Rôle / Fonction :</label>
-          <select id="authRole">
-            <option value="Conducteur Convoi">Conducteur Convoi Minéralier</option>
-            <option value="Chef de Secteur Voies">Chef de Secteur (Voies & Bâtiments)</option>
-            <option value="Régulateur PCD">Régulateur Central (PCD Nouadhibou/Zouérate)</option>
+          <label for="agentRole">Rôle / Fonction :</label>
+          <select id="agentRole" class="form-control">
+            <option value="Conducteur Convoi Minéralier">Conducteur Convoi Minéralier</option>
+            <option value="Régulateur Central (PCD)">Régulateur Central (PCD Nouadhibou/Zouérate)</option>
+            <option value="Chef de Secteur Voies">Chef de Secteur Voies / Maintenance</option>
+            <option value="Inspecteur Sécurité">Inspecteur Sécurité Ferroviaire</option>
           </select>
         </div>
-        <div class="modal-actions">
-          <button type="submit" class="btn-submit" style="background:#0284c7;">VALIDER LA SESSION</button>
-        </div>
+
+        <button type="submit" class="btn-submit">VALIDER LA SESSION</button>
+        <button type="button" id="btnLogout" class="btn-logout" style="display:none;" onclick="logoutAgent()">DÉCONNEXION / CHANGER AGENT</button>
       </form>
     </div>
   </div>
 
-  <!-- MODAL 2: SIGNALEMENT D'ANOMALIE TERRAIN -->
-  <div class="modal-overlay" id="reportModal">
-    <div class="modal-card" style="border-color:#ef4444;">
-      <div class="modal-title" style="color:#ef4444;">⚠️ DÉCLARER UNE ANOMALIE TERRAIN</div>
-      <form onsubmit="submitReport(event)">
-        <div class="form-group">
-          <label>Identifiant Emetteur :</label>
-          <input type="text" id="repDriver" readonly style="opacity: 0.7;" />
-        </div>
-
-        <div class="form-group">
-          <label>Point Kilométrique Approximatif (PK) :</label>
-          <select id="repPK">
-            <option value="PK 0 (Nouadhibou Port)">PK 0 - Nouadhibou Port</option>
-            <option value="PK 200 (Ben Amira)">PK 200 - Ben Amira</option>
-            <option value="PK 460 (Choum)">PK 460 - Passe de Choum</option>
-            <option value="PK 650 (F'Dérik)">PK 650 - F'Dérik</option>
-            <option value="PK 704 (Zouérate)">PK 704 - Zouérate</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Type d'incident :</label>
-          <select id="repType">
-            <option value="Ensablement de la voie (Dune)">🐫 Ensablement de la voie (Dune)</option>
-            <option value="Dromadaires proches/sur les rails">🐪 Dromadaires proches/sur les rails</option>
-            <option value="Anomalie de structure / Rail chaud">🛤️ Anomalie de structure / Rail chaud</option>
-            <option value="Panne / Problème mécanique">🔧 Panne / Problème mécanique</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Détails / Remarques :</label>
-          <textarea id="repDetails" rows="2" placeholder="Ex: Dune de 30cm sur 50m..."></textarea>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-cancel" onclick="closeReportModal()">Annuler</button>
-          <button type="submit" class="btn-submit">TRANSMETTRE (CLOUD/OFFLINE)</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
+  <!-- MAP CONTAINER -->
   <div id="map"></div>
 
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="status-row">
+      <div class="app-title">
+        <span class="status-dot"></span>
+        <span>PCD 2.0 SNIM</span>
+      </div>
+      <div id="agentBadge" class="agent-badge">NON CONNECTÉ</div>
+    </div>
+    
+    <div class="nav-buttons">
+      <button class="nav-btn danger" onclick="showToast('Signalement d\'anomalie initié')"><i class="fa-solid fa-triangle-exclamation"></i> ANOMALIE</button>
+      <button class="nav-btn" onclick="toggleMute()"><i class="fa-solid fa-volume-high" id="soundIcon"></i> SON : ON</button>
+      <button class="nav-btn warning" onclick="showToast('Mode nuit activé')"><i class="fa-solid fa-moon"></i> NUIT</button>
+      <button class="nav-btn" onclick="openAuthModal()"><i class="fa-solid fa-key"></i> AGENT</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD PANEL -->
+  <div class="dashboard-panel">
+    <div class="panel-header">
+      <i class="fa-solid fa-satellite-dish"></i> POSTE DE COMMANDEMENT SNIM
+    </div>
+    <div class="data-grid">
+      <div class="data-item">
+        <div class="data-label">Flotte IoT / Mode</div>
+        <div class="data-value">Simulation Balises</div>
+      </div>
+      <div class="data-item">
+        <div class="data-label">Vitesse Moyenne</div>
+        <div class="data-value">48 km/h</div>
+      </div>
+      <div class="data-item">
+        <div class="data-label">Tonnage Minéralier</div>
+        <div class="data-value">21 500 T (Fer)</div>
+      </div>
+      <div class="data-item alert">
+        <div class="data-label">Météo des Rails</div>
+        <div class="data-value">47°C (MODÉRÉ)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script>
-    // -----------------------------------------------------------------
-    // 1. SERVICES CLOUD & PERSISTANCE SUPABASE (Online/Offline Sync)
-    // -----------------------------------------------------------------
-    const SUPABASE_URL = "https://ggbyxzeexmwtonqmao.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnl4emVleGV4bXd0b25xbWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NjM5OTYsImV4cCI6MjEwMTQzOTk5Nn0.cc7MSLDhGuvkEW8M4iAkls312IyVoaToDvWQ0gow1dw";
-    let supabaseClient = null;
+    let map;
+    let currentUser = null;
 
-    try {
-      if (window.supabase) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      }
-    } catch(e) { console.warn("Supabase mode local actif."); }
-
-    // -----------------------------------------------------------------
-    // 2. ENREGISTREMENT AUTOMATIQUE DU SERVICE WORKER (PWA OFFLINE)
-    // -----------------------------------------------------------------
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE_NAME = 'snim-pcd-v2';
-        self.addEventListener('install', e => {
-          e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
-        });
-        self.addEventListener('fetch', e => {
-          e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
-        });
-      `;
-      const blob = new Blob([swCode], { type: 'text/javascript' });
-      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
-    }
-
-    // -----------------------------------------------------------------
-    // 3. INITIALISATION CARTE SATELLITE
-    // -----------------------------------------------------------------
-    const map = L.map('map', { 
-      zoomControl: false, 
-      attributionControl: false 
-    }).setView([21.3000, -14.5000], 7);
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19
-    }).addTo(map);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd'
-    }).addTo(map);
-
-    const snimTrackPoints = [
-      [22.7441, -12.4789],
-      [22.6800, -12.7000],
-      [22.1000, -12.8500],
-      [21.3000, -13.0000],
-      [21.3200, -14.5000],
-      [21.2000, -15.5000],
-      [21.0000, -16.2000],
-      [20.9322, -17.0342]
-    ];
-
-    L.polyline(snimTrackPoints, {
-      color: '#f59e0b',
-      weight: 5,
-      dashArray: '8, 10',
-      opacity: 0.9
-    }).addTo(map);
-
-    const pkMarkers = [
-      { name: "PK 704 (Zouérate Mine)", coords: [22.7441, -12.4789] },
-      { name: "PK 650 (F'Dérik)", coords: [22.6800, -12.7000] },
-      { name: "PK 460 (Choum)", coords: [21.3000, -13.0000] },
-      { name: "PK 200 (Ben Amira)", coords: [21.0000, -16.2000] },
-      { name: "PK 0 (Nouadhibou Port)", coords: [20.9322, -17.0342] }
-    ];
-
-    pkMarkers.forEach(pk => {
-      const icon = L.divIcon({
-        className: 'custom-pk',
-        html: `<div class="pk-badge">📍 ${pk.name}</div>`,
-        iconAnchor: [30, 10]
-      });
-      L.marker(pk.coords, { icon: icon }).addTo(map);
+    // 1. Initialisation de la carte au chargement du DOM
+    document.addEventListener("DOMContentLoaded", () => {
+      initMap();
+      checkAuthStatus();
     });
 
-    // -----------------------------------------------------------------
-    // 4. ETAT DE L'APPLICATION & UTILISATEUR
-    // -----------------------------------------------------------------
-    let currentUser = JSON.parse(localStorage.getItem('snim_user') || 'null');
-    let soundEnabled = true;
-    let nightMode = false;
-    let realGPSActive = false;
-    let gpsWatchId = null;
-    let userMarker = null;
-    let heatmapActive = false;
-    let audioContext = null;
-    let maintenanceLayers = [];
+    function initMap() {
+      // Centré sur le tracé de la voie ferrée SNIM (Mauritanie)
+      map = L.map('map', { zoomControl: false }).setView([20.5123, -13.0245], 7);
 
-    // Déverrouillage automatique AudioContext Mobile sur premier touch
-    window.addEventListener('click', initAudioContext, { once: true });
-    window.addEventListener('touchstart', initAudioContext, { once: true });
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'SNIM PCD 2.0 | Esri World Imagery',
+        maxZoom: 18
+      }).addTo(map);
 
-    function initAudioContext() {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
+      // Repères fictifs des PK (Points Kilométriques)
+      L.marker([20.5123, -13.0245]).addTo(map).bindPopup("<b>PK 460 - Passe de Choum</b>");
+      L.marker([22.6844, -12.4722]).addTo(map).bindPopup("<b>PK 704 - Zouérate Mine</b>");
     }
 
-    function playAlertSound() {
-      if (!soundEnabled) return;
-      try {
-        if (audioContext && audioContext.state === 'suspended') audioContext.resume();
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(880, audioContext.currentTime);
-        gain.gain.setValueAtTime(0.25, audioContext.currentTime);
-        osc.connect(gain);
-        gain.connect(audioContext.destination);
-        osc.start();
-        osc.stop(audioContext.currentTime + 0.35);
-      } catch(e) {}
-    }
+    // 2. Gestion de l'état d'authentification
+    function checkAuthStatus() {
+      const storedUser = localStorage.getItem("snim_agent_session");
+      const authModal = document.getElementById("authModal");
 
-    // AUTHENTIFICATION & ROLES
-    function updateUIForUser() {
-      const badge = document.getElementById('userRoleBadge');
-      if (currentUser) {
-        badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
-        document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
+      if (storedUser) {
+        currentUser = JSON.parse(storedUser);
+        updateUIForUser();
+        authModal.classList.add("hidden"); // Cache le verrou d'accès
       } else {
-        badge.innerText = "NON CONNECTÉ";
+        // Force l'affichage de l'écran de verrouillage
+        openAuthModal(true);
       }
     }
 
-    function openAuthModal() {
-      document.getElementById('authModal').style.display = 'flex';
+    function openAuthModal(forceLock = false) {
+      const authModal = document.getElementById("authModal");
+      const btnLogout = document.getElementById("btnLogout");
+
+      if (currentUser && !forceLock) {
+        // Pré-remplir avec les informations actuelles si l'agent clique sur "AGENT"
+        document.getElementById("agentMatricule").value = currentUser.matricule;
+        document.getElementById("agentRole").value = currentUser.role;
+        btnLogout.style.display = "block";
+      } else {
+        btnLogout.style.display = "none";
+      }
+
+      authModal.classList.remove("hidden");
     }
 
-    function handleAuth(e) {
-      e.preventDefault();
-      const matricule = document.getElementById('authMatricule').value;
-      const role = document.getElementById('authRole').value;
-      currentUser = { matricule, role };
-      localStorage.setItem('snim_user', JSON.stringify(currentUser));
+    function handleAuthSubmit(event) {
+      event.preventDefault();
+
+      const matricule = document.getElementById("agentMatricule").value.trim();
+      const role = document.getElementById("agentRole").value;
+
+      if (!matricule) return;
+
+      currentUser = {
+        matricule: matricule,
+        role: role,
+        loginTime: new Date().toISOString()
+      };
+
+      // Sauvegarde dans le LocalStorage pour persistance
+      localStorage.setItem("snim_agent_session", JSON.stringify(currentUser));
+
       updateUIForUser();
-      document.getElementById('authModal').style.display = 'none';
-      showToast(`🔑 Bienvenue Agent ${matricule} !`);
+
+      // Fermeture de la modale de verrouillage
+      document.getElementById("authModal").classList.add("hidden");
+
+      showToast(`Bienvenue Agent ${currentUser.matricule} !`);
     }
 
-    // TOGGLES DE CONTROLE
-    function toggleAudio() {
-      soundEnabled = !soundEnabled;
-      document.getElementById('btnAudio').innerText = soundEnabled ? "🔊 SON : ON" : "🔇 MUTE";
+    function logoutAgent() {
+      localStorage.removeItem("snim_agent_session");
+      currentUser = null;
+
+      document.getElementById("agentMatricule").value = "";
+      document.getElementById("agentBadge").innerText = "NON CONNECTÉ";
+      document.getElementById("agentBadge").style.borderColor = "var(--accent-red)";
+      document.getElementById("agentBadge").style.color = "#fca5a5";
+
+      showToast("Session fermée");
+      openAuthModal(true);
     }
 
-    function toggleNightMode() {
-      nightMode = !nightMode;
-      document.getElementById('map').classList.toggle('night-mode', nightMode);
-      document.getElementById('btnNight').classList.toggle('btn-active', nightMode);
+    function updateUIForUser() {
+      if (!currentUser) return;
+      const badge = document.getElementById("agentBadge");
+      badge.innerText = `${currentUser.matricule} (${currentUser.role.split(' ')[0]})`;
+      badge.style.borderColor = "var(--accent-blue)";
+      badge.style.color = "#38bdf8";
     }
 
-    function toggleSidePanel() {
-      document.getElementById('sidePanel').classList.toggle('collapsed');
+    // Utilitaires de test UI
+    function showToast(message) {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerText = message;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
     }
 
-    function switchTab(tab) {
-      if (tab === 'live') {
-        document.getElementById('tabLive').style.display = 'block';
-        document.getElementById('tabStats').style.display = 'none';
-        document.getElementById('tabLiveBtn').classList.add('active');
-        document.getElementById('tabStatsBtn').classList.remove('active');
-      } else {
-        document.getElementById('tabLive').style.display = 'none';
-        document.getElementById('tabStats').style.display = 'block';
-        document.getElementById('tabLiveBtn').classList.remove('active');
-        document.getElementById('tabStatsBtn').classList.add('active');
-      }
+    let isMuted = false;
+    function toggleMute() {
+      isMuted = !isMuted;
+      const soundIcon = document.getElementById("soundIcon");
+      soundIcon.className = isMuted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+      showToast(isMuted ? "Son Désactivé" : "Son Activé");
     }
-
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      toast.innerText = msg;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 3200);
-    }
-
-    // -----------------------------------------------------------------
-    // 5. GPS RÉEL / IoT TRACKING
-    // -----------------------------------------------------------------
-    function toggleGPSReal() {
-      realGPSActive = !realGPSActive;
-      const btn = document.getElementById('btnGPSReal');
-      const trackModeLabel = document.getElementById('tTrackMode');
-
-      if (realGPSActive) {
-        btn.classList.add('btn-active');
-        trackModeLabel.innerText = "GPS Mobile Live";
-        trackModeLabel.style.color = "#10b981";
-
-        if (navigator.geolocation) {
-          gpsWatchId = navigator.geolocation.watchPosition(
-            pos => {
-              const { latitude, longitude } = pos.coords;
-              if (!userMarker) {
-                userMarker = L.marker([latitude, longitude], {
-                  icon: L.divIcon({ html: '🛰️', className: 'train-icon', iconSize: [28,28] })
-                }).addTo(map).bindPopup("<b>Position Réelle Vôtre / Convoi</b>");
-              } else {
-                userMarker.setLatLng([latitude, longitude]);
-              }
-              map.flyTo([latitude, longitude], 12);
-            },
-            err => { showToast("⚠️ Position GPS introuvable"); },
-            { enableHighAccuracy: true }
-          );
-        }
-      } else {
-        btn.classList.remove('btn-active');
-        trackModeLabel.innerText = "Simulation Balises";
-        trackModeLabel.style.color = "#38bdf8";
-        if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
-        if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
-      }
-    }
-
-    // -----------------------------------------------------------------
-    // 6. GESTION DES SIGNALEMENTS (DEUX NIVEAUX : LOCAL & CLOUD)
-    // -----------------------------------------------------------------
-    async function loadSavedReports() {
-      const reportsList = document.getElementById('driverReportsList');
-      reportsList.innerHTML = '';
-
-      let reportsToDisplay = [];
-
-      if (navigator.onLine && supabaseClient) {
-        try {
-          const { data, error } = await supabaseClient
-            .from('reports')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (!error && data && data.length > 0) {
-            reportsToDisplay = data.map(r => ({
-              pk: r.pk,
-              type: r.type,
-              details: r.details,
-              driver: 'Agent SNIM',
-              time: new Date(r.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            }));
-          }
-        } catch(err) {
-          console.warn("Récupération Cloud échouée, passage sur le LocalStorage.");
-        }
-      }
-
-      if (reportsToDisplay.length === 0) {
-        reportsToDisplay = JSON.parse(localStorage.getItem('snim_reports') || '[]');
-      }
-
-      reportsToDisplay.forEach(r => {
-        const item = document.createElement('div');
-        item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0;";
-        item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time || ''} - ${r.driver || ''}</small>`;
-        reportsList.appendChild(item);
-      });
-
-      document.getElementById('offlineQueueCount').innerText = `${reportsToDisplay.length} Alerte(s)`;
-    }
-
-    function openReportModal() {
-      if (!currentUser) {
-        openAuthModal();
-        showToast("⚠️ Connectez votre matricule agent d'abord.");
-        return;
-      }
-      document.getElementById('reportModal').style.display = 'flex';
-    }
-
-    function closeReportModal() {
-      document.getElementById('reportModal').style.display = 'none';
-    }
-
-    async function submitReport(e) {
-      e.preventDefault();
-      const driver = currentUser ? `${currentUser.matricule} (${currentUser.role})` : "Agent Inconnu";
-      const pk = document.getElementById('repPK').value;
-      const type = document.getElementById('repType').value;
-      const details = document.getElementById('repDetails').value;
-      const nowTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-      const newReport = { pk, type, details, driver, time: `Aujourd'hui à ${nowTime}` };
-
-      // Stockage local garanti
-      const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
-      currentReports.unshift(newReport);
-      localStorage.setItem('snim_reports', JSON.stringify(currentReports));
-
-      // Synchronisation Cloud Supabase
-      if (navigator.onLine && supabaseClient) {
-        try {
-          const { error } = await supabaseClient.from('reports').insert([{ pk: pk, type: type, details: details }]);
-          if (!error) {
-            showToast("☁️ Synchro Cloud PCD Réussie !");
-          } else {
-            showToast("💾 Stocké en local (Erreur Cloud).");
-          }
-        } catch(err) {
-          showToast("💾 Stocké en mémoire locale.");
-        }
-      } else {
-        showToast("💾 Stocké en mémoire locale (Zone Blanche).");
-      }
-
-      loadSavedReports();
-
-      document.getElementById('topPanel').classList.add('alert-active');
-      document.getElementById('panelTitle').innerText = `🚨 ALERTE : ${pk}`;
-      playAlertSound();
-
-      closeReportModal();
-      switchTab('stats');
-      if (document.getElementById('sidePanel').classList.contains('collapsed')) {
-        toggleSidePanel();
-      }
-    }
-
-    // -----------------------------------------------------------------
-    // 7. MAINTENANCE & SIMULATION DU FLUX TERRAIN
-    // -----------------------------------------------------------------
-    function toggleHeatmap() {
-      heatmapActive = !heatmapActive;
-      document.getElementById('btnHeatmap').classList.toggle('btn-active', heatmapActive);
-
-      if (heatmapActive) {
-        const hotSpots = [
-          { coords: [21.3200, -14.5000], name: "PK 460 - Passe de Choum" },
-          { coords: [22.1000, -12.8500], name: "PK 650 - Zone F'Dérik" },
-          { coords: [21.0000, -16.2000], name: "PK 200 - Ben Amira" }
-        ];
-
-        hotSpots.forEach(pt => {
-          const circle = L.circle(pt.coords, {
-            radius: 15000, color: '#f97316', fillColor: '#ea580c', fillOpacity: 0.45
-          }).addTo(map);
-          circle.bindPopup(`<b>🛠️ ZONE CRITIQUE MAINTENANCE (${pt.name})</b><br/>Risque Ensablement : Élevé`);
-          maintenanceLayers.push(circle);
-        });
-      } else {
-        maintenanceLayers.forEach(l => map.removeLayer(l));
-        maintenanceLayers = [];
-      }
-    }
-
-    const trains = [
-      {
-        id: "SNIM-M1", name: "Train Minéralier Heavy 1", routeIndex: 0, direction: 1, speed: 48,
-        position: [...snimTrackPoints[0]], marker: null, safetyCircle: null
-      },
-      {
-        id: "SNIM-V2", name: "Train Convoyeur Vides 2", routeIndex: snimTrackPoints.length - 1, direction: -1, speed: 58,
-        position: [...snimTrackPoints[snimTrackPoints.length - 1]], marker: null, safetyCircle: null
-      }
-    ];
-
-    trains.forEach(t => {
-      t.marker = L.marker(t.position, {
-        icon: L.divIcon({ html: `<div class="train-icon">🚂</div>`, iconSize: [28, 28], iconAnchor: [14, 14] })
-      }).addTo(map);
-
-      t.safetyCircle = L.circle(t.position, {
-        radius: 2000, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15, dashArray: '4, 6'
-      }).addTo(map);
-    });
-
-    function updatePositions() {
-      const currentTemp = 42 + Math.floor(Math.random() * 10);
-      document.getElementById('tRailTemp').innerText = `${currentTemp}°C`;
-      document.getElementById('tDilatation').innerHTML = currentTemp > 49 
-        ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
-        : `<span style="color:#10b981;">MODÉRÉ</span>`;
-
-      // Maj statut réseau
-      const netLabel = document.getElementById('netStatus');
-      if (navigator.onLine) {
-        netLabel.innerText = "En Ligne (Online)";
-        netLabel.style.color = "#10b981";
-      } else {
-        netLabel.innerText = "Hors Ligne (Désert)";
-        netLabel.style.color = "#ef4444";
-      }
-
-      trains.forEach(t => {
-        t.routeIndex += t.direction * 0.12;
-
-        if (t.routeIndex >= snimTrackPoints.length - 1) { t.direction = -1; t.routeIndex = snimTrackPoints.length - 1; }
-        else if (t.routeIndex <= 0) { t.direction = 1; t.routeIndex = 0; }
-
-        const idx = Math.floor(t.routeIndex);
-        const nextIdx = Math.min(idx + 1, snimTrackPoints.length - 1);
-        const ratio = t.routeIndex - idx;
-
-        const p1 = snimTrackPoints[idx];
-        const p2 = snimTrackPoints[nextIdx];
-
-        t.position = [p1[0] + (p2[0] - p1[0]) * ratio, p1[1] + (p2[1] - p1[1]) * ratio];
-        
-        t.marker.setLatLng(t.position);
-        t.safetyCircle.setLatLng(t.position);
-
-        t.marker.bindPopup(`
-          <div style="font-size:12px;">
-            <b style="color:#d97706;">🚂 ${t.name} (${t.id})</b><br/>
-            <b>Vitesse Live :</b> ${t.speed} km/h<br/>
-            <b style="color:#ef4444;">Zone d'arrêt d'urgence : 1.8 km</b>
-          </div>
-        `);
-      });
-    }
-
-    // Synchro automatique des données stockées hors-ligne au retour de la connexion
-    window.addEventListener('online', () => {
-      showToast("📡 Connexion rétablie ! Synchro des alertes...");
-      loadSavedReports();
-    });
-
-    // Initialisation globale
-    if (!currentUser) openAuthModal();
-    else updateUIForUser();
-
-    loadSavedReports();
-    setInterval(updatePositions, 4000);
   </script>
 </body>
 </html>
