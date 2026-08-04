@@ -21,6 +21,12 @@
       width: 100%;
       height: 100%;
       background: #090d16;
+      overflow: hidden;
+    }
+
+    /* Masquer définitivement la publicité / attribution Leaflet en bas à droite */
+    .leaflet-control-attribution {
+      display: none !important;
     }
 
     /* Mode Nuit Tactical */
@@ -107,9 +113,9 @@
     .btn-active { background: #d97706 !important; }
     .btn-report { background: #dc2626 !important; border-color: #f87171 !important; }
 
-    /* Panneau Télémétrique Latéral Rétractable */
+    /* Conteneur Panneau Latéral */
     .side-panel {
-      position: absolute;
+      position: fixed;
       bottom: 25px;
       left: 10px;
       z-index: 1000;
@@ -122,29 +128,39 @@
       padding: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 75vh;
+      max-height: 70vh;
       overflow-y: auto;
     }
 
+    /* Quand le panneau est fermé, il glisse entièrement vers la gauche */
     .side-panel.collapsed {
       transform: translateX(-340px);
     }
 
+    /* BoutonOnglet Fixe Toujours Accessible sur le bord gauche de l'écran */
     .side-toggle-btn {
-      position: absolute;
-      right: -36px;
-      top: 10px;
+      position: fixed;
+      left: 10px;
+      bottom: 25px;
+      z-index: 1001; /* Reste toujours au-dessus de la carte */
       background: #0f172a;
-      border: 1px solid rgba(56, 189, 248, 0.4);
+      border: 1px solid rgba(56, 189, 248, 0.6);
       color: white;
-      width: 36px;
-      height: 36px;
-      border-radius: 0 8px 8px 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 18px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Quand le panneau est ouvert, le bouton s'aligne à droite du panneau */
+    .side-panel:not(.collapsed) + .side-toggle-btn {
+      left: 340px;
     }
 
     /* Onglets Panneau Latéral */
@@ -204,7 +220,7 @@
       filter: drop-shadow(0 0 6px rgba(0,0,0,0.9));
     }
 
-    /* Badges Points Kilométriques avec contraste amélioré */
+    /* Badges Points Kilométriques */
     .pk-badge {
       background: rgba(15, 23, 42, 0.95);
       border: 1px solid #f59e0b;
@@ -299,7 +315,7 @@
       cursor: pointer;
     }
 
-    /* Notification Toast Feedback UX */
+    /* Notification Toast */
     .toast-notification {
       position: fixed;
       top: 70px;
@@ -350,7 +366,7 @@
   <!-- Toast de notification UX -->
   <div class="toast-notification" id="toast">✅ Signalement transmis avec succès au PCD !</div>
 
-  <!-- Panneau Supérieur -->
+  <!-- Panneau Supérieur (Conservé tel quel) -->
   <div class="top-panel" id="topPanel">
     <div class="brand">
       <div class="pulse"></div>
@@ -368,8 +384,6 @@
 
   <!-- Panneau Télémétrique & Analytics Side -->
   <div class="side-panel" id="sidePanel">
-    <button class="side-toggle-btn" onclick="toggleSidePanel()">📊</button>
-
     <div class="panel-tabs">
       <button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">📡 TEMPS RÉEL</button>
       <button class="tab-btn" id="tabStatsBtn" onclick="switchTab('stats')">📊 ANALYTICS & PK</button>
@@ -448,6 +462,9 @@
 
   </div>
 
+  <!-- Bouton Onglet Fixe Toujours Accessible pour ouvrir/fermer le panneau -->
+  <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
+
   <!-- MODAL DE SIGNALEMENT POUR CONDUCTEURS EN CABINE -->
   <div class="modal-overlay" id="reportModal">
     <div class="modal-card">
@@ -501,12 +518,14 @@
   <div id="map"></div>
 
   <script>
-    // 1. CARTE SATELLITE ARCGIS HD
-    const map = L.map('map', { zoomControl: false }).setView([21.3000, -14.5000], 7);
+    // 1. CARTE SATELLITE ARCGIS HD (Attribution désactivée)
+    const map = L.map('map', { 
+      zoomControl: false,
+      attributionControl: false 
+    }).setView([21.3000, -14.5000], 7);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19,
-      attribution: 'ArcGIS Satellite HD'
+      maxZoom: 19
     }).addTo(map);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
@@ -514,7 +533,7 @@
       subdomains: 'abcd'
     }).addTo(map);
 
-    // 2. VOIE FERRÉE SNIM ET POINTS KILOMÉTRIQUES (PK 0 À PK 704)
+    // 2. VOIE FERRÉE SNIM ET POINTS KILOMÉTRIQUES
     const snimTrackPoints = [
       [22.7441, -12.4789], // PK 704 Zouérate
       [22.6800, -12.7000], // PK 650 F'Dérik
@@ -588,7 +607,8 @@
     }
 
     function toggleSidePanel() {
-      document.getElementById('sidePanel').classList.toggle('collapsed');
+      const sidePanel = document.getElementById('sidePanel');
+      sidePanel.classList.toggle('collapsed');
     }
 
     function switchTab(tab) {
@@ -624,7 +644,6 @@
       reportsList.innerHTML = '';
 
       if (saved.length === 0) {
-        // Incident par défaut si vide
         saved.push({
           pk: "PK 460 (Choum)",
           type: "Ensablement Voie",
@@ -660,15 +679,13 @@
 
       const newReport = { pk, type, details, driver, time: `Aujourd'hui à ${nowTime}` };
 
-      // Sauvegarde locale (Persistance Hors-Ligne)
+      // Sauvegarde locale
       const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
       currentReports.unshift(newReport);
       localStorage.setItem('snim_reports', JSON.stringify(currentReports));
 
-      // Recharger la liste
       loadSavedReports();
 
-      // Notification visuelle & sonore
       document.getElementById('topPanel').classList.add('alert-active');
       document.getElementById('panelTitle').innerText = `🚨 SIGNALEMENT CABINE : ${pk}`;
       playAlertSound();
@@ -676,14 +693,13 @@
 
       closeReportModal();
 
-      // Basculer vers l'onglet analytics pour voir le résultat
       switchTab('stats');
       if (document.getElementById('sidePanel').classList.contains('collapsed')) {
         toggleSidePanel();
       }
     }
 
-    // 4. MAINTENANCE PRÉDICTIVE (POINTS CHAUDS D'ENSABLEMENT)
+    // 4. MAINTENANCE PRÉDICTIVE
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
       document.getElementById('btnHeatmap').classList.toggle('btn-active', heatmapActive);
