@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PCD 2.0 SNIM - Industrial Command Center</title>
+  <title>PCD 2.0 SNIM - Command Center</title>
   
   <!-- Manifeste PWA embarqué -->
   <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;&#125;">
@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- Client Backend Supabase (Temps Réel & Sync Cloud) -->
+  <!-- Client Backend Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -31,15 +31,13 @@
       overflow: hidden;
     }
 
-    .leaflet-control-attribution {
-      display: none !important;
-    }
+    .leaflet-control-attribution { display: none !important; }
 
     .night-mode {
       filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%);
     }
 
-    /* BANDEAU SUPÉRIEUR TACTIQUE */
+    /* BANDEAU SUPÉRIEUR */
     .top-panel {
       position: absolute;
       top: 10px;
@@ -119,13 +117,13 @@
     .btn-active { background: #d97706 !important; }
     .btn-report { background: #dc2626 !important; border-color: #f87171 !important; }
 
-    /* PANNEAU LATÉRAL ET BOUTON FLOTTANT */
+    /* PANNEAU LATÉRAL */
     .side-panel {
       position: fixed;
       bottom: 25px;
       left: 10px;
       z-index: 1000;
-      width: 320px;
+      width: 330px;
       background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(56, 189, 248, 0.4);
@@ -134,13 +132,11 @@
       padding: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 70vh;
+      max-height: 72vh;
       overflow-y: auto;
     }
 
-    .side-panel.collapsed {
-      transform: translateX(-340px);
-    }
+    .side-panel.collapsed { transform: translateX(-350px); }
 
     .side-toggle-btn {
       position: fixed;
@@ -162,9 +158,7 @@
       transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .side-panel:not(.collapsed) + .side-toggle-btn {
-      left: 340px;
-    }
+    .side-panel:not(.collapsed) + .side-toggle-btn { left: 350px; }
 
     .panel-tabs {
       display: flex;
@@ -186,10 +180,7 @@
       cursor: pointer;
     }
 
-    .tab-btn.active {
-      background: #0284c7;
-      color: white;
-    }
+    .tab-btn.active { background: #0284c7; color: white; }
 
     .telemetry-section {
       margin-top: 10px;
@@ -212,10 +203,7 @@
       margin-bottom: 3px;
     }
 
-    .telemetry-value {
-      font-weight: bold;
-      color: #38bdf8;
-    }
+    .telemetry-value { font-weight: bold; color: #38bdf8; }
 
     .pk-badge {
       background: rgba(15, 23, 42, 0.95);
@@ -229,7 +217,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.9);
     }
 
-    /* MODALES DE CONNEXION ET SIGNALEMENT */
+    /* MODALES ET OVERLAYS */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -242,11 +230,7 @@
       padding: 15px;
     }
 
-    /* FORÇAGE DU BLOCAGE AUTHENTIFICATION AU DÉMARRAGE */
-    #authModal {
-      display: flex !important;
-      z-index: 99999 !important;
-    }
+    #authModal { display: flex !important; z-index: 99999 !important; }
 
     .modal-card {
       background: #0f172a;
@@ -269,9 +253,7 @@
       margin-bottom: 12px;
     }
 
-    .form-group {
-      margin-bottom: 12px;
-    }
+    .form-group { margin-bottom: 12px; }
 
     .form-group label {
       display: block;
@@ -290,11 +272,7 @@
       font-size: 12px;
     }
 
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 14px;
-    }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
 
     .btn-submit {
       flex: 1;
@@ -316,7 +294,6 @@
       cursor: pointer;
     }
 
-    /* TOAST SYSTEM */
     .toast-notification {
       position: fixed;
       top: 75px;
@@ -348,17 +325,37 @@
       margin: 3px 0 8px 0;
     }
 
-    .stat-bar-fill {
-      height: 100%;
-      background: #f59e0b;
+    .stat-bar-fill { height: 100%; background: #f59e0b; }
+
+    .filter-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 4px 8px;
+      font-size: 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
     }
+    .filter-btn.active { background: #0284c7; color: white; border-color: #38bdf8; }
+
+    .badge-severity {
+      display: inline-block;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .sev-critical { background: #dc2626; color: white; }
+    .sev-medium { background: #d97706; color: white; }
+    .sev-info { background: #0284c7; color: white; }
 
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   </style>
 </head>
 <body>
 
-  <!-- Toast de notification -->
   <div class="toast-notification" id="toast">✅ Notification Système SNIM</div>
 
   <!-- BANDEAU HAUT -->
@@ -387,7 +384,7 @@
     
     <!-- VUE 1 : TEMPS RÉEL -->
     <div id="tabLive">
-      <h4 style="color:#f59e0b; font-size:12px; margin-bottom:8px;">POSTE DE COMMANDEMENT SNIM</h4>
+      <h4 style="color:#f59e0b; font-size:12px; margin-bottom:8px;" id="panelRoleTitle">POSTE DE COMMANDEMENT SNIM</h4>
       
       <div class="telemetry-section">
         <div class="telemetry-title">🚂 FLOTTE & CAPTEURS IoT</div>
@@ -396,7 +393,7 @@
         <div class="telemetry-item"><span>Tonnage Minéralier :</span><span class="telemetry-value">21 500 T (Fer)</span></div>
       </div>
 
-      <div class="telemetry-section">
+      <div class="telemetry-section" id="sectionEnergy">
         <div class="telemetry-title">📉 ÉNERGIE & CARBURANT</div>
         <div class="telemetry-item"><span>Conso Estimée :</span><span class="telemetry-value" style="color:#10b981;">14.2 L/km</span></div>
         <div class="telemetry-item"><span>Optimisation Conduite :</span><span class="telemetry-value" style="color:#10b981;">+8.5% Économie</span></div>
@@ -417,13 +414,13 @@
       <div class="telemetry-section">
         <div class="telemetry-title">📡 RACCORDEMENT CLOUD & SYNC</div>
         <div class="telemetry-item"><span>Statut Réseau :</span><span class="telemetry-value" id="netStatus" style="color:#10b981;">En Ligne</span></div>
-        <div class="telemetry-item"><span>File d'attente Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
+        <div class="telemetry-item"><span>En Attente Sync Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
       </div>
     </div>
 
     <!-- VUE 2 : ANALYTICS & HISTORIQUE INCIDENTS -->
     <div id="tabStats" style="display: none;">
-      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE SYNCHRONISÉ (CLOUD)</h4>
+      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE SYNCHRONISÉ (CLOUD/LOCAL)</h4>
 
       <div class="telemetry-section">
         <div class="telemetry-title">⚠️ REPARTITION DES ALERTES</div>
@@ -445,8 +442,19 @@
       </div>
 
       <div class="telemetry-section">
-        <div class="telemetry-title">📢 SIGNALEMENTS DIRECTS (LIVE)</div>
-        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1;"></div>
+        <div class="telemetry-title">📢 SIGNALEMENTS DIRECTS</div>
+        
+        <!-- Filtres par gravité et recherche -->
+        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+          <button class="filter-btn active" id="fAll" onclick="filterReports('all')">TOUT</button>
+          <button class="filter-btn" id="fCrit" onclick="filterReports('CRITIQUE')">🔴 CRITIQUE</button>
+          <button class="filter-btn" id="fMed" onclick="filterReports('MOYEN')">🟠 MOYEN</button>
+          <button class="filter-btn" id="fInfo" onclick="filterReports('INFO')">🔵 INFO</button>
+        </div>
+
+        <input type="text" id="reportSearch" placeholder="🔍 Filtrer par PK ou mot-clé..." onkeyup="renderReports()" style="width:100%; background:#1e293b; border:1px solid #334155; color:white; padding:5px; border-radius:4px; font-size:10px; margin-bottom:8px;">
+
+        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1; max-height: 200px; overflow-y: auto;"></div>
       </div>
     </div>
 
@@ -454,7 +462,7 @@
 
   <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
-  <!-- MODAL 1: AUTHENTIFICATION AGENT SNIM (VERROUILLAGE SYSTÈME) -->
+  <!-- MODAL 1: AUTHENTIFICATION AGENT SNIM -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-card">
       <div class="modal-title">🔑 AUTHENTIFICATION AGENT SNIM</div>
@@ -478,18 +486,18 @@
     </div>
   </div>
 
-  <!-- MODAL 2: SIGNALEMENT D'ANOMALIE TERRAIN -->
+  <!-- MODAL 2: SIGNALEMENT D'ANOMALIE ENRICHI -->
   <div class="modal-overlay" id="reportModal">
     <div class="modal-card" style="border-color:#ef4444;">
       <div class="modal-title" style="color:#ef4444;">⚠️ DÉCLARER UNE ANOMALIE TERRAIN</div>
       <form onsubmit="submitReport(event)">
         <div class="form-group">
-          <label>Identifiant Emetteur :</label>
+          <label>Identifiant Émetteur :</label>
           <input type="text" id="repDriver" readonly style="opacity: 0.7;" />
         </div>
 
         <div class="form-group">
-          <label>Point Kilométrique Approximatif (PK) :</label>
+          <label>Point Kilométrique (PK) :</label>
           <select id="repPK">
             <option value="PK 0 (Nouadhibou Port)">PK 0 - Nouadhibou Port</option>
             <option value="PK 200 (Ben Amira)">PK 200 - Ben Amira</option>
@@ -506,17 +514,27 @@
             <option value="Dromadaires proches/sur les rails">🐪 Dromadaires proches/sur les rails</option>
             <option value="Anomalie de structure / Rail chaud">🛤️ Anomalie de structure / Rail chaud</option>
             <option value="Panne / Problème mécanique">🔧 Panne / Problème mécanique</option>
+            <option value="Cassure de Rail / Obstacle Majeur">🚨 Cassure de Rail / Obstacle Majeur</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label>Détails / Remarques :</label>
-          <textarea id="repDetails" rows="2" placeholder="Ex: Dune de 30cm sur 50m..."></textarea>
+          <label>Niveau de Gravité :</label>
+          <select id="repSeverity">
+            <option value="CRITIQUE" style="color:#ef4444;">🔴 CRITIQUE (Arrêt Immédiat recommandé)</option>
+            <option value="MOYEN" selected style="color:#f59e0b;">🟠 MOYEN (Ralentissement requis)</option>
+            <option value="INFO" style="color:#38bdf8;">🔵 INFO (Vigilance / Maintenance)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Détails & Consignes :</label>
+          <textarea id="repDetails" rows="2" placeholder="Ex: Dune de 30cm sur 50m... Limiter vitesse à 20km/h"></textarea>
         </div>
 
         <div class="modal-actions">
           <button type="button" class="btn-cancel" onclick="closeReportModal()">Annuler</button>
-          <button type="submit" class="btn-submit">TRANSMETTRE (CLOUD/OFFLINE)</button>
+          <button type="submit" class="btn-submit">TRANSMETTRE (LOCAL/CLOUD)</button>
         </div>
       </form>
     </div>
@@ -526,9 +544,9 @@
 
   <script>
     // -----------------------------------------------------------------
-    // 1. SERVICES CLOUD & PERSISTANCE DUAL-MODE (Offline/Online Sync)
+    // 1. SERVICES CLOUD & PERSISTANCE DUAL-MODE
     // -----------------------------------------------------------------
-    const SUPABASE_URL = "https://xyzcompany.supabase.co"; // URL Supabase (Emplacement générique)
+    const SUPABASE_URL = "https://xyzcompany.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
     let supabaseClient = null;
 
@@ -539,11 +557,11 @@
     } catch(e) { console.warn("Supabase mode local actif."); }
 
     // -----------------------------------------------------------------
-    // 2. ENREGISTREMENT AUTOMATIQUE DU SERVICE WORKER (PWA OFFLINE)
+    // 2. ENREGISTREMENT SERVICE WORKER PWA
     // -----------------------------------------------------------------
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE_NAME = 'snim-pcd-v2';
+        const CACHE_NAME = 'snim-pcd-v3';
         self.addEventListener('install', e => {
           e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
         });
@@ -556,39 +574,20 @@
     }
 
     // -----------------------------------------------------------------
-    // 3. INITIALISATION CARTE SATELLITE
+    // 3. INITIALISATION CARTE
     // -----------------------------------------------------------------
-    const map = L.map('map', { 
-      zoomControl: false, 
-      attributionControl: false 
-    }).setView([21.3000, -14.5000], 7);
+    const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19
-    }).addTo(map);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      subdomains: 'abcd'
-    }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(map);
 
     const snimTrackPoints = [
-      [22.7441, -12.4789],
-      [22.6800, -12.7000],
-      [22.1000, -12.8500],
-      [21.3000, -13.0000],
-      [21.3200, -14.5000],
-      [21.2000, -15.5000],
-      [21.0000, -16.2000],
-      [20.9322, -17.0342]
+      [22.7441, -12.4789], [22.6800, -12.7000], [22.1000, -12.8500],
+      [21.3000, -13.0000], [21.3200, -14.5000], [21.2000, -15.5000],
+      [21.0000, -16.2000], [20.9322, -17.0342]
     ];
 
-    L.polyline(snimTrackPoints, {
-      color: '#f59e0b',
-      weight: 5,
-      dashArray: '8, 10',
-      opacity: 0.9
-    }).addTo(map);
+    L.polyline(snimTrackPoints, { color: '#f59e0b', weight: 5, dashArray: '8, 10', opacity: 0.9 }).addTo(map);
 
     const pkMarkers = [
       { name: "PK 704 (Zouérate Mine)", coords: [22.7441, -12.4789] },
@@ -599,16 +598,12 @@
     ];
 
     pkMarkers.forEach(pk => {
-      const icon = L.divIcon({
-        className: 'custom-pk',
-        html: `<div class="pk-badge">📍 ${pk.name}</div>`,
-        iconAnchor: [30, 10]
-      });
+      const icon = L.divIcon({ className: 'custom-pk', html: `<div class="pk-badge">📍 ${pk.name}</div>`, iconAnchor: [30, 10] });
       L.marker(pk.coords, { icon: icon }).addTo(map);
     });
 
     // -----------------------------------------------------------------
-    // 4. ETAT DE L'APPLICATION & UTILISATEUR
+    // 4. ÉTAT & UTILISATEUR
     // -----------------------------------------------------------------
     let currentUser = JSON.parse(localStorage.getItem('snim_user') || 'null');
     let soundEnabled = true;
@@ -619,15 +614,13 @@
     let heatmapActive = false;
     let audioContext = null;
     let maintenanceLayers = [];
+    let currentFilter = 'all';
 
-    // Déverrouillage automatique AudioContext Mobile sur premier touch
     window.addEventListener('click', initAudioContext, { once: true });
     window.addEventListener('touchstart', initAudioContext, { once: true });
 
     function initAudioContext() {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
     function playAlertSound() {
@@ -646,10 +639,10 @@
       } catch(e) {}
     }
 
-    // AUTHENTIFICATION, VERROUILLAGE & ROLES
     function updateUIForUser() {
       const badge = document.getElementById('userRoleBadge');
       const authBtn = document.getElementById('btnAuthToggle');
+      const roleTitle = document.getElementById('panelRoleTitle');
       
       if (currentUser) {
         badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
@@ -657,6 +650,15 @@
         authBtn.innerText = "🔓 DÉCONNEXION";
         authBtn.style.background = "#dc2626";
         document.getElementById('authModal').style.setProperty('display', 'none', 'important');
+
+        // Vue métier adaptée
+        if (currentUser.role.includes("Conducteur")) {
+          roleTitle.innerText = "CABINE CONDUCTEUR - POSTE BORD";
+        } else if (currentUser.role.includes("Régulateur")) {
+          roleTitle.innerText = "CENTRE DE RÉGULATION CENTRAL (PCD)";
+        } else {
+          roleTitle.innerText = "INSPECTION VOIES & INFRASTRUCTURES";
+        }
       } else {
         badge.innerText = "NON CONNECTÉ";
         authBtn.innerText = "🔑 AGENT";
@@ -665,20 +667,15 @@
       }
     }
 
-    function openAuthModal() {
-      document.getElementById('authModal').style.setProperty('display', 'flex', 'important');
-    }
+    function openAuthModal() { document.getElementById('authModal').style.setProperty('display', 'flex', 'important'); }
 
     function handleAuthButtonClick() {
       if (currentUser) {
-        // Déconnexion de la session
         currentUser = null;
         localStorage.removeItem('snim_user');
         showToast("🔒 Session clôturée.");
         updateUIForUser();
-      } else {
-        openAuthModal();
-      }
+      } else { openAuthModal(); }
     }
 
     function handleAuth(e) {
@@ -691,7 +688,6 @@
       showToast(`🔑 Session ouverte : Agent ${matricule}`);
     }
 
-    // TOGGLES DE CONTROLE
     function toggleAudio() {
       soundEnabled = !soundEnabled;
       document.getElementById('btnAudio').innerText = soundEnabled ? "🔊 SON : ON" : "🔇 MUTE";
@@ -703,9 +699,7 @@
       document.getElementById('btnNight').classList.toggle('btn-active', nightMode);
     }
 
-    function toggleSidePanel() {
-      document.getElementById('sidePanel').classList.toggle('collapsed');
-    }
+    function toggleSidePanel() { document.getElementById('sidePanel').classList.toggle('collapsed'); }
 
     function switchTab(tab) {
       if (tab === 'live') {
@@ -729,7 +723,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 5. GPS RÉEL / IoT TRACKING
+    // 5. GPS RÉEL
     // -----------------------------------------------------------------
     function toggleGPSReal() {
       realGPSActive = !realGPSActive;
@@ -749,9 +743,7 @@
                 userMarker = L.marker([latitude, longitude], {
                   icon: L.divIcon({ html: '🛰️', className: 'train-icon', iconSize: [28,28] })
                 }).addTo(map).bindPopup("<b>Position Réelle Vôtre / Convoi</b>");
-              } else {
-                userMarker.setLatLng([latitude, longitude]);
-              }
+              } else { userMarker.setLatLng([latitude, longitude]); }
               map.flyTo([latitude, longitude], 12);
             },
             err => { showToast("⚠️ Position GPS introuvable"); },
@@ -768,21 +760,57 @@
     }
 
     // -----------------------------------------------------------------
-    // 6. GESTION DES SIGNALEMENTS (DEUX NIVEAUX : LOCAL & CLOUD)
+    // 6. GESTION DES SIGNALEMENTS ET FILTRES
     // -----------------------------------------------------------------
-    function loadSavedReports() {
+    function filterReports(sev) {
+      currentFilter = sev;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      if (sev === 'all') document.getElementById('fAll').classList.add('active');
+      if (sev === 'CRITIQUE') document.getElementById('fCrit').classList.add('active');
+      if (sev === 'MOYEN') document.getElementById('fMed').classList.add('active');
+      if (sev === 'INFO') document.getElementById('fInfo').classList.add('active');
+      renderReports();
+    }
+
+    function renderReports() {
       const saved = JSON.parse(localStorage.getItem('snim_reports') || '[]');
       const reportsList = document.getElementById('driverReportsList');
+      const search = document.getElementById('reportSearch').value.toLowerCase();
       reportsList.innerHTML = '';
 
-      saved.forEach(r => {
+      const filtered = saved.filter(r => {
+        const matchesFilter = (currentFilter === 'all') || (r.severity === currentFilter);
+        const matchesSearch = r.pk.toLowerCase().includes(search) || r.type.toLowerCase().includes(search) || (r.details && r.details.toLowerCase().includes(search));
+        return matchesFilter && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        reportsList.innerHTML = `<div style="text-align:center; padding:10px; color:#64748b;">Aucun signalement correspondant</div>`;
+        return;
+      }
+
+      filtered.forEach(r => {
         const item = document.createElement('div');
-        item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0;";
-        item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time} - ${r.driver}</small>`;
+        item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.08); padding: 6px 0;";
+        
+        let sevClass = "sev-info";
+        if (r.severity === "CRITIQUE") sevClass = "sev-critical";
+        if (r.severity === "MOYEN") sevClass = "sev-medium";
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <b style="color:#f59e0b;">${r.pk}</b>
+            <span class="badge-severity ${sevClass}">${r.severity || 'INFO'}</span>
+          </div>
+          <div>${r.type}</div>
+          <small style="color:#94a3b8; font-style:italic;">"${r.details || 'Aucune remarque'}"</small><br/>
+          <small style="color:#64748b;">${r.time} - ${r.driver}</small>
+        `;
         reportsList.appendChild(item);
       });
 
-      document.getElementById('offlineQueueCount').innerText = `${saved.length} Alerte(s)`;
+      const pending = saved.filter(r => !r.synced).length;
+      document.getElementById('offlineQueueCount').innerText = `${pending} Alerte(s) localement`;
     }
 
     function openReportModal() {
@@ -794,49 +822,49 @@
       document.getElementById('reportModal').style.display = 'flex';
     }
 
-    function closeReportModal() {
-      document.getElementById('reportModal').style.display = 'none';
-    }
+    function closeReportModal() { document.getElementById('reportModal').style.display = 'none'; }
 
     function submitReport(e) {
       e.preventDefault();
       const driver = currentUser ? `${currentUser.matricule} (${currentUser.role})` : "Agent Inconnu";
       const pk = document.getElementById('repPK').value;
       const type = document.getElementById('repType').value;
+      const severity = document.getElementById('repSeverity').value;
       const details = document.getElementById('repDetails').value;
       const nowTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-      const newReport = { pk, type, details, driver, time: `Aujourd'hui à ${nowTime}` };
+      const newReport = { pk, type, severity, details, driver, time: `Aujourd'hui à ${nowTime}`, synced: false };
 
-      // Stockage local garanti
       const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
       currentReports.unshift(newReport);
       localStorage.setItem('snim_reports', JSON.stringify(currentReports));
 
-      // Synchronisation Cloud si possible
       if (navigator.onLine && supabaseClient) {
         supabaseClient.from('reports').insert([newReport]).then(() => {
+          newReport.synced = true;
+          localStorage.setItem('snim_reports', JSON.stringify(currentReports));
           showToast("☁️ Synchro Cloud PCD Réussie !");
-        }).catch(() => {});
+          renderReports();
+        }).catch(() => { showToast("💾 Enregistré localement (Attente réseau)"); });
       } else {
         showToast("💾 Stocké en mémoire locale (Zone Blanche).");
       }
 
-      loadSavedReports();
+      renderReports();
 
-      document.getElementById('topPanel').classList.add('alert-active');
-      document.getElementById('panelTitle').innerText = `🚨 ALERTE : ${pk}`;
-      playAlertSound();
+      if (severity === "CRITIQUE") {
+        document.getElementById('topPanel').classList.add('alert-active');
+        document.getElementById('panelTitle').innerText = `🚨 CRITIQUE : ${pk}`;
+        playAlertSound();
+      }
 
       closeReportModal();
       switchTab('stats');
-      if (document.getElementById('sidePanel').classList.contains('collapsed')) {
-        toggleSidePanel();
-      }
+      if (document.getElementById('sidePanel').classList.contains('collapsed')) { toggleSidePanel(); }
     }
 
     // -----------------------------------------------------------------
-    // 7. MAINTENANCE & SIMULATION DU FLUX TERRAIN
+    // 7. SIMULATION & MAINTENANCE
     // -----------------------------------------------------------------
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
@@ -850,9 +878,7 @@
         ];
 
         hotSpots.forEach(pt => {
-          const circle = L.circle(pt.coords, {
-            radius: 15000, color: '#f97316', fillColor: '#ea580c', fillOpacity: 0.45
-          }).addTo(map);
+          const circle = L.circle(pt.coords, { radius: 15000, color: '#f97316', fillColor: '#ea580c', fillOpacity: 0.45 }).addTo(map);
           circle.bindPopup(`<b>🛠️ ZONE CRITIQUE MAINTENANCE (${pt.name})</b><br/>Risque Ensablement : Élevé`);
           maintenanceLayers.push(circle);
         });
@@ -863,24 +889,13 @@
     }
 
     const trains = [
-      {
-        id: "SNIM-M1", name: "Train Minéralier Heavy 1", routeIndex: 0, direction: 1, speed: 48,
-        position: [...snimTrackPoints[0]], marker: null, safetyCircle: null
-      },
-      {
-        id: "SNIM-V2", name: "Train Convoyeur Vides 2", routeIndex: snimTrackPoints.length - 1, direction: -1, speed: 58,
-        position: [...snimTrackPoints[snimTrackPoints.length - 1]], marker: null, safetyCircle: null
-      }
+      { id: "SNIM-M1", name: "Train Minéralier Heavy 1", routeIndex: 0, direction: 1, speed: 48, position: [...snimTrackPoints[0]], marker: null, safetyCircle: null },
+      { id: "SNIM-V2", name: "Train Convoyeur Vides 2", routeIndex: snimTrackPoints.length - 1, direction: -1, speed: 58, position: [...snimTrackPoints[snimTrackPoints.length - 1]], marker: null, safetyCircle: null }
     ];
 
     trains.forEach(t => {
-      t.marker = L.marker(t.position, {
-        icon: L.divIcon({ html: `<div class="train-icon">🚂</div>`, iconSize: [28, 28], iconAnchor: [14, 14] })
-      }).addTo(map);
-
-      t.safetyCircle = L.circle(t.position, {
-        radius: 2000, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15, dashArray: '4, 6'
-      }).addTo(map);
+      t.marker = L.marker(t.position, { icon: L.divIcon({ html: `<div class="train-icon">🚂</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(map);
+      t.safetyCircle = L.circle(t.position, { radius: 2000, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15, dashArray: '4, 6' }).addTo(map);
     });
 
     function updatePositions() {
@@ -890,7 +905,6 @@
         ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
         : `<span style="color:#10b981;">MODÉRÉ</span>`;
 
-      // Maj statut réseau
       const netLabel = document.getElementById('netStatus');
       if (navigator.onLine) {
         netLabel.innerText = "En Ligne (Online)";
@@ -902,7 +916,6 @@
 
       trains.forEach(t => {
         t.routeIndex += t.direction * 0.12;
-
         if (t.routeIndex >= snimTrackPoints.length - 1) { t.direction = -1; t.routeIndex = snimTrackPoints.length - 1; }
         else if (t.routeIndex <= 0) { t.direction = 1; t.routeIndex = 0; }
 
@@ -914,7 +927,6 @@
         const p2 = snimTrackPoints[nextIdx];
 
         t.position = [p1[0] + (p2[0] - p1[0]) * ratio, p1[1] + (p2[1] - p1[1]) * ratio];
-        
         t.marker.setLatLng(t.position);
         t.safetyCircle.setLatLng(t.position);
 
@@ -928,15 +940,14 @@
       });
     }
 
-    // Synchro automatique des données stockées hors-ligne au retour de la connexion
     window.addEventListener('online', () => {
       showToast("📡 Connexion rétablie ! Synchro des alertes...");
-      loadSavedReports();
+      renderReports();
     });
 
-    // Initialisation globale
+    // Initialisation
     updateUIForUser();
-    loadSavedReports();
+    renderReports();
     setInterval(updatePositions, 4000);
   </script>
 </body>
