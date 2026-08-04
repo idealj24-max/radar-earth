@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Radar Satellite Live</title>
   
-  <!-- Moteur Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -75,12 +74,11 @@
       cursor: pointer;
     }
 
-    .plane-marker {
+    .plane-icon {
       font-size: 18px;
       line-height: 1;
       text-shadow: 0 0 4px #000;
       display: inline-block;
-      transition: transform 0.4s ease-out;
     }
 
     @keyframes blink {
@@ -97,7 +95,7 @@
       RADAR SATELLITE
     </div>
     <div class="stats">
-      Vols : <strong id="flightCount">0</strong>
+      Vols : <strong id="flightCount">Chargement...</strong>
     </div>
     <button class="btn" onclick="fetchLiveFlights()">ACTUALISER</button>
   </div>
@@ -105,9 +103,9 @@
   <div id="map"></div>
 
   <script>
-    // Carte satellite ArcGIS
     const map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
 
+    // Fonds Satellite HD + Noms des pays/villes
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
       attribution: 'ArcGIS Satellite'
@@ -122,47 +120,41 @@
 
     async function fetchLiveFlights() {
       try {
-        // API OpenSky avec contournement CORS pour mobile
-        const targetUrl = 'https://opensky-network.org/api/states/all';
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
-        
-        const res = await fetch(proxyUrl);
+        // Source ADS-B ouverte et ultra rapide sans restriction CORS
+        const res = await fetch('https://api.adsb.lol/v2/lat/20/lon/0/dist/3000');
         const data = await res.json();
 
-        if (data && data.states) {
+        if (data && data.ac) {
           markersGroup.clearLayers();
 
-          const flights = data.states
-            .filter(f => f[5] !== null && f[6] !== null)
+          // Filtrer les avions avec positions valides (limité aux 400 plus proches)
+          const flights = data.ac
+            .filter(f => f.lat !== undefined && f.lon !== undefined)
             .slice(0, 400);
 
           document.getElementById('flightCount').innerText = flights.length;
 
           flights.forEach(flight => {
-            const callsign = flight[1] ? flight[1].trim() : 'N/A';
-            const country = flight[2] || 'Inconnu';
-            const lon = flight[5];
-            const lat = flight[6];
-            const alt = flight[7] ? Math.round(flight[7]) + ' m' : 'Sol';
-            const speed = flight[9] ? Math.round(flight[9] * 3.6) : 0;
-            const heading = flight[10] || 0;
+            const callsign = flight.flight ? flight.flight.trim() : 'INCONNU';
+            const alt = flight.alt_baro ? flight.alt_baro + ' ft' : 'Sol';
+            const speed = flight.gs ? Math.round(flight.gs * 1.852) + ' km/h' : '0 km/h';
+            const track = flight.track || 0;
 
             const icon = L.divIcon({
               className: 'custom-icon',
-              html: `<div class="plane-marker" style="transform: rotate(${heading - 45}deg);">✈️</div>`,
+              html: `<div class="plane-icon" style="transform: rotate(${track - 45}deg);">✈️</div>`,
               iconSize: [20, 20],
               iconAnchor: [10, 10]
             });
 
-            const marker = L.marker([lat, lon], { icon: icon });
+            const marker = L.marker([flight.lat, flight.lon], { icon: icon });
 
             marker.bindPopup(`
               <div style="font-family: sans-serif; font-size: 13px; color: #0f172a;">
                 <strong style="color: #0284c7; font-size: 14px;">✈️ VOL ${callsign}</strong><br/>
-                <b>Origine :</b> ${country}<br/>
                 <b>Altitude :</b> ${alt}<br/>
-                <b>Vitesse :</b> ${speed} km/h<br/>
-                <b>Cap :</b> ${heading}°
+                <b>Vitesse :</b> ${speed}<br/>
+                <b>Cap :</b> ${track}°
               </div>
             `);
 
@@ -170,12 +162,13 @@
           });
         }
       } catch (err) {
-        console.error("Erreur de récupération :", err);
+        console.error("Erreur de synchronisation :", err);
+        document.getElementById('flightCount').innerText = "Erreur API";
       }
     }
 
     fetchLiveFlights();
-    setInterval(fetchLiveFlights, 15000);
+    setInterval(fetchLiveFlights, 12000);
   </script>
 </body>
 </html>
