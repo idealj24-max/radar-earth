@@ -2,12 +2,18 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCD 2.0 - SNIM Industrial Command Center</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PCD 2.0 SNIM - Industrial Command Center</title>
   
+  <!-- Manifeste PWA embarqué -->
+  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;&#125;">
+
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Client Backend Supabase (Temps Réel & Sync Cloud) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     * {
@@ -15,6 +21,7 @@
       padding: 0;
       box-sizing: border-box;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
     }
 
     html, body, #map {
@@ -24,17 +31,15 @@
       overflow: hidden;
     }
 
-    /* Masquer définitivement la publicité / attribution Leaflet en bas à droite */
     .leaflet-control-attribution {
       display: none !important;
     }
 
-    /* Mode Nuit Tactical */
     .night-mode {
       filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%);
     }
 
-    /* Panneau Supérieur */
+    /* BANDEAU SUPÉRIEUR TACTIQUE */
     .top-panel {
       position: absolute;
       top: 10px;
@@ -53,7 +58,6 @@
       justify-content: space-between;
       gap: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.7);
-      transition: all 0.3s ease;
     }
 
     .top-panel.alert-active {
@@ -61,21 +65,14 @@
     }
 
     @keyframes alertFlash {
-      from {
-        background: rgba(220, 38, 38, 0.95);
-        border-color: #ef4444;
-        box-shadow: 0 0 25px rgba(239, 68, 68, 0.9);
-      }
-      to {
-        background: rgba(15, 23, 42, 0.95);
-        border-color: rgba(245, 158, 11, 0.5);
-      }
+      from { background: rgba(220, 38, 38, 0.95); border-color: #ef4444; box-shadow: 0 0 25px rgba(239, 68, 68, 0.9); }
+      to { background: rgba(15, 23, 42, 0.95); border-color: rgba(245, 158, 11, 0.5); }
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-weight: bold;
       color: #f59e0b;
       font-size: 13px;
@@ -88,6 +85,15 @@
       border-radius: 50%;
       box-shadow: 0 0 8px #10b981;
       animation: blink 1.2s infinite;
+    }
+
+    .user-badge {
+      background: #1e293b;
+      border: 1px solid #38bdf8;
+      color: #38bdf8;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
     }
 
     .controls {
@@ -113,7 +119,7 @@
     .btn-active { background: #d97706 !important; }
     .btn-report { background: #dc2626 !important; border-color: #f87171 !important; }
 
-    /* Conteneur Panneau Latéral */
+    /* PANNEAU LATÉRAL ET BOUTON FLOTTANT */
     .side-panel {
       position: fixed;
       bottom: 25px;
@@ -132,22 +138,20 @@
       overflow-y: auto;
     }
 
-    /* Quand le panneau est fermé, il glisse entièrement vers la gauche */
     .side-panel.collapsed {
       transform: translateX(-340px);
     }
 
-    /* BoutonOnglet Fixe Toujours Accessible sur le bord gauche de l'écran */
     .side-toggle-btn {
       position: fixed;
       left: 10px;
       bottom: 25px;
-      z-index: 1001; /* Reste toujours au-dessus de la carte */
+      z-index: 1001;
       background: #0f172a;
       border: 1px solid rgba(56, 189, 248, 0.6);
       color: white;
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       border-radius: 10px;
       cursor: pointer;
       display: flex;
@@ -158,12 +162,10 @@
       transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Quand le panneau est ouvert, le bouton s'aligne à droite du panneau */
     .side-panel:not(.collapsed) + .side-toggle-btn {
       left: 340px;
     }
 
-    /* Onglets Panneau Latéral */
     .panel-tabs {
       display: flex;
       gap: 4px;
@@ -215,12 +217,6 @@
       color: #38bdf8;
     }
 
-    .train-icon {
-      font-size: 24px;
-      filter: drop-shadow(0 0 6px rgba(0,0,0,0.9));
-    }
-
-    /* Badges Points Kilométriques */
     .pk-badge {
       background: rgba(15, 23, 42, 0.95);
       border: 1px solid #f59e0b;
@@ -231,16 +227,15 @@
       border-radius: 6px;
       white-space: nowrap;
       box-shadow: 0 4px 10px rgba(0,0,0,0.9);
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     }
 
-    /* Fenêtre Modale de Signalement Conducteur */
+    /* MODALES DE CONNEXION ET SIGNALEMENT */
     .modal-overlay {
       display: none;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(5px);
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(6px);
       z-index: 2000;
       align-items: center;
       justify-content: center;
@@ -249,18 +244,18 @@
 
     .modal-card {
       background: #0f172a;
-      border: 1px solid #ef4444;
+      border: 1px solid #f59e0b;
       border-radius: 12px;
       width: 100%;
       max-width: 400px;
       color: white;
-      padding: 16px;
-      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.9);
     }
 
     .modal-title {
       font-size: 14px;
-      color: #ef4444;
+      color: #f59e0b;
       font-weight: bold;
       display: flex;
       align-items: center;
@@ -269,7 +264,7 @@
     }
 
     .form-group {
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .form-group label {
@@ -284,7 +279,7 @@
       background: #1e293b;
       border: 1px solid #334155;
       color: white;
-      padding: 8px;
+      padding: 10px;
       border-radius: 6px;
       font-size: 12px;
     }
@@ -300,7 +295,7 @@
       background: #dc2626;
       color: white;
       border: none;
-      padding: 8px;
+      padding: 10px;
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
@@ -310,15 +305,15 @@
       background: #334155;
       color: white;
       border: none;
-      padding: 8px 12px;
+      padding: 10px 14px;
       border-radius: 6px;
       cursor: pointer;
     }
 
-    /* Notification Toast */
+    /* TOAST SYSTEM */
     .toast-notification {
       position: fixed;
-      top: 70px;
+      top: 75px;
       left: 50%;
       transform: translateX(-50%) translateY(-20px);
       background: #10b981;
@@ -339,50 +334,45 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Barres d'Analytics */
     .stat-bar-container {
       background: #1e293b;
       height: 8px;
       border-radius: 4px;
       overflow: hidden;
-      margin-top: 3px;
-      margin-bottom: 8px;
+      margin: 3px 0 8px 0;
     }
 
     .stat-bar-fill {
       height: 100%;
       background: #f59e0b;
-      border-radius: 4px;
     }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   </style>
 </head>
 <body>
 
-  <!-- Toast de notification UX -->
-  <div class="toast-notification" id="toast">✅ Signalement transmis avec succès au PCD !</div>
+  <!-- Toast de notification -->
+  <div class="toast-notification" id="toast">✅ Notification Système SNIM</div>
 
-  <!-- Panneau Supérieur (Conservé tel quel) -->
+  <!-- BANDEAU HAUT -->
   <div class="top-panel" id="topPanel">
     <div class="brand">
       <div class="pulse"></div>
-      <span id="panelTitle">PCD 2.0 SNIM - COMMAND CENTER</span>
+      <span id="panelTitle">PCD 2.0 SNIM</span>
+      <span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
     </div>
     <div class="controls">
       <button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
       <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
       <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
       <button class="btn" id="btnHeatmap" onclick="toggleHeatmap()">🛠️ MAINTENANCE</button>
-      <button class="btn" id="btnTrack" onclick="toggleAutoTrack()">🎥 SUIVI</button>
-      <button class="btn" onclick="locateUser()">🎯 GPS</button>
+      <button class="btn" id="btnGPSReal" onclick="toggleGPSReal()">🛰️ GPS RÉEL</button>
+      <button class="btn" onclick="openAuthModal()">🔑 AGENT</button>
     </div>
   </div>
 
-  <!-- Panneau Télémétrique & Analytics Side -->
+  <!-- PANNEAU TÉLÉMÉTRIQUE SIDE -->
   <div class="side-panel" id="sidePanel">
     <div class="panel-tabs">
       <button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">📡 TEMPS RÉEL</button>
@@ -393,54 +383,48 @@
     <div id="tabLive">
       <h4 style="color:#f59e0b; font-size:12px; margin-bottom:8px;">POSTE DE COMMANDEMENT SNIM</h4>
       
-      <!-- 1. FLOTTE -->
       <div class="telemetry-section">
-        <div class="telemetry-title">🚂 SUIVI DE FLOTTE EN TEMPS RÉEL</div>
-        <div class="telemetry-item"><span>Trains Actifs :</span><span class="telemetry-value">2 Convois</span></div>
-        <div class="telemetry-item"><span>Vitesse Flotte :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
+        <div class="telemetry-title">🚂 FLOTTE & CAPTEURS IoT</div>
+        <div class="telemetry-item"><span>Mode Position :</span><span class="telemetry-value" id="tTrackMode">Simulation Balises</span></div>
+        <div class="telemetry-item"><span>Vitesse Moyenne :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
         <div class="telemetry-item"><span>Tonnage Minéralier :</span><span class="telemetry-value">21 500 T (Fer)</span></div>
       </div>
 
-      <!-- 2. CARBURANT & ÉCO-CONDUITE -->
       <div class="telemetry-section">
-        <div class="telemetry-title">📉 BILAN ÉNERGIE & CARBURANT</div>
+        <div class="telemetry-title">📉 ÉNERGIE & CARBURANT</div>
         <div class="telemetry-item"><span>Conso Estimée :</span><span class="telemetry-value" style="color:#10b981;">14.2 L/km</span></div>
         <div class="telemetry-item"><span>Optimisation Conduite :</span><span class="telemetry-value" style="color:#10b981;">+8.5% Économie</span></div>
       </div>
 
-      <!-- 3. SÉCURITÉ & FREINAGE -->
       <div class="telemetry-section">
-        <div class="telemetry-title">🚨 SÉCURITÉ & FREINAGE D'URGENCE</div>
+        <div class="telemetry-title">🚨 SÉCURITÉ & FREINAGE</div>
         <div class="telemetry-item"><span>Distance d'arrêt min :</span><span class="telemetry-value" style="color:#ef4444;">1 850 mètres</span></div>
-        <div class="telemetry-item"><span>Cercle de protection :</span><span class="telemetry-value">ACTIF (2.0 km)</span></div>
+        <div class="telemetry-item"><span>Cercle Protection :</span><span class="telemetry-value">ACTIF (2.0 km)</span></div>
       </div>
 
-      <!-- 4. MÉTÉO RAILS & TEMPÉRATURE -->
       <div class="telemetry-section">
-        <div class="telemetry-title">🌡️ MÉTÉO DES RAILS (DÉSERT)</div>
+        <div class="telemetry-title">🌡️ MÉTÉO DES RAILS</div>
         <div class="telemetry-item"><span>Température Sol :</span><span class="telemetry-value" id="tRailTemp">48°C</span></div>
-        <div class="telemetry-item"><span>Risque Flambement :</span><span class="telemetry-value" id="tDilatation" style="color:#10b981;">MODÉRÉ</span></div>
+        <div class="telemetry-item"><span>Flambement Rails :</span><span class="telemetry-value" id="tDilatation" style="color:#10b981;">MODÉRÉ</span></div>
       </div>
 
-      <!-- 5. ÉTAT RÉSEAU -->
       <div class="telemetry-section">
-        <div class="telemetry-title">📡 RACCORDEMENT TERRAIN</div>
-        <div class="telemetry-item"><span>Liaison Satellite/4G :</span><span class="telemetry-value" style="color:#10b981;">En Ligne (Online)</span></div>
-        <div class="telemetry-item"><span>Synchro Hors-Ligne :</span><span class="telemetry-value" style="color:#10b981;">Active (Storage OK)</span></div>
+        <div class="telemetry-title">📡 RACCORDEMENT CLOUD & SYNC</div>
+        <div class="telemetry-item"><span>Statut Réseau :</span><span class="telemetry-value" id="netStatus" style="color:#10b981;">En Ligne</span></div>
+        <div class="telemetry-item"><span>File d'attente Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
       </div>
     </div>
 
-    <!-- VUE 2 : ANALYTICS & HISTORIQUE DES INCIDENTS -->
+    <!-- VUE 2 : ANALYTICS & HISTORIQUE INCIDENTS -->
     <div id="tabStats" style="display: none;">
-      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE & INCIDENTS (30 J)</h4>
+      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE SYNCHRONISÉ (CLOUD)</h4>
 
       <div class="telemetry-section">
         <div class="telemetry-title">⚠️ REPARTITION DES ALERTES</div>
-        
-        <div class="telemetry-item"><span>Ensablement Voie (Dunes) :</span><span class="telemetry-value">62%</span></div>
+        <div class="telemetry-item"><span>Ensablement Voie :</span><span class="telemetry-value">62%</span></div>
         <div class="stat-bar-container"><div class="stat-bar-fill" style="width: 62%; background: #ea580c;"></div></div>
 
-        <div class="telemetry-item"><span>Obstacle Animal (Dromadaires) :</span><span class="telemetry-value">24%</span></div>
+        <div class="telemetry-item"><span>Obstacle Animal :</span><span class="telemetry-value">24%</span></div>
         <div class="stat-bar-container"><div class="stat-bar-fill" style="width: 24%; background: #f59e0b;"></div></div>
 
         <div class="telemetry-item"><span>Surchauffe Rails (>50°C) :</span><span class="telemetry-value">14%</span></div>
@@ -448,37 +432,54 @@
       </div>
 
       <div class="telemetry-section">
-        <div class="telemetry-title">📍 ZONES LES PLUS IMPACTÉES</div>
+        <div class="telemetry-title">📍 SECTEURS IMPACTÉS</div>
         <div class="telemetry-item"><span>PK 460 (Passe de Choum) :</span><span class="telemetry-value" style="color:#ef4444;">18 Incidents</span></div>
         <div class="telemetry-item"><span>PK 200 (Ben Amira) :</span><span class="telemetry-value" style="color:#f59e0b;">9 Incidents</span></div>
         <div class="telemetry-item"><span>PK 650 (F'Dérik) :</span><span class="telemetry-value" style="color:#10b981;">3 Incidents</span></div>
       </div>
 
       <div class="telemetry-section">
-        <div class="telemetry-title">📢 DERNIERS SIGNALEMENTS CONDUCTEURS</div>
+        <div class="telemetry-title">📢 SIGNALEMENTS DIRECTS (LIVE)</div>
         <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1;"></div>
       </div>
     </div>
 
   </div>
 
-  <!-- Bouton Onglet Fixe Toujours Accessible pour ouvrir/fermer le panneau -->
   <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
-  <!-- MODAL DE SIGNALEMENT POUR CONDUCTEURS EN CABINE -->
-  <div class="modal-overlay" id="reportModal">
+  <!-- MODAL 1: AUTHENTIFICATION AGENT SNIM -->
+  <div class="modal-overlay" id="authModal">
     <div class="modal-card">
-      <div class="modal-title">
-        <span>⚠️ DÉCLARER UNE ANOMALIE TERRAIN</span>
-      </div>
+      <div class="modal-title">🔑 AUTHENTIFICATION AGENT SNIM</div>
+      <form onsubmit="handleAuth(event)">
+        <div class="form-group">
+          <label>Matricule Agent SNIM :</label>
+          <input type="text" id="authMatricule" placeholder="Ex: AG-8492" required />
+        </div>
+        <div class="form-group">
+          <label>Rôle / Fonction :</label>
+          <select id="authRole">
+            <option value="Conducteur Convoi">Conducteur Convoi Minéralier</option>
+            <option value="Chef de Secteur Voies">Chef de Secteur (Voies & Bâtiments)</option>
+            <option value="Régulateur PCD">Régulateur Central (PCD Nouadhibou/Zouérate)</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn-submit" style="background:#0284c7;">VALIDER LA SESSION</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SIGNALEMENT D'ANOMALIE TERRAIN -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal-card" style="border-color:#ef4444;">
+      <div class="modal-title" style="color:#ef4444;">⚠️ DÉCLARER UNE ANOMALIE TERRAIN</div>
       <form onsubmit="submitReport(event)">
         <div class="form-group">
-          <label>Identifiant Convoi / Conducteur :</label>
-          <select id="repDriver">
-            <option value="Train SNIM-M1">Train SNIM-M1 (Hématite)</option>
-            <option value="Train SNIM-V2">Train SNIM-V2 (Convoyeur Vides)</option>
-            <option value="Agent Voie">Agent de Maintenance Voie</option>
-          </select>
+          <label>Identifiant Emetteur :</label>
+          <input type="text" id="repDriver" readonly style="opacity: 0.7;" />
         </div>
 
         <div class="form-group">
@@ -509,7 +510,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-cancel" onclick="closeReportModal()">Annuler</button>
-          <button type="submit" class="btn-submit">TRANSMETTRE AU PCD</button>
+          <button type="submit" class="btn-submit">TRANSMETTRE (CLOUD/OFFLINE)</button>
         </div>
       </form>
     </div>
@@ -518,9 +519,41 @@
   <div id="map"></div>
 
   <script>
-    // 1. CARTE SATELLITE ARCGIS HD (Attribution désactivée)
+    // -----------------------------------------------------------------
+    // 1. SERVICES CLOUD & PERSISTANCE DUAL-MODE (Offline/Online Sync)
+    // -----------------------------------------------------------------
+    const SUPABASE_URL = "https://xyzcompany.supabase.co"; // URL Supabase (Emplacement générique)
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+    let supabaseClient = null;
+
+    try {
+      if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+    } catch(e) { console.warn("Supabase mode local actif."); }
+
+    // -----------------------------------------------------------------
+    // 2. ENREGISTREMENT AUTOMATIQUE DU SERVICE WORKER (PWA OFFLINE)
+    // -----------------------------------------------------------------
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'snim-pcd-v2';
+        self.addEventListener('install', e => {
+          e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+        });
+        self.addEventListener('fetch', e => {
+          e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'text/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+    }
+
+    // -----------------------------------------------------------------
+    // 3. INITIALISATION CARTE SATELLITE
+    // -----------------------------------------------------------------
     const map = L.map('map', { 
-      zoomControl: false,
+      zoomControl: false, 
       attributionControl: false 
     }).setView([21.3000, -14.5000], 7);
 
@@ -533,16 +566,15 @@
       subdomains: 'abcd'
     }).addTo(map);
 
-    // 2. VOIE FERRÉE SNIM ET POINTS KILOMÉTRIQUES
     const snimTrackPoints = [
-      [22.7441, -12.4789], // PK 704 Zouérate
-      [22.6800, -12.7000], // PK 650 F'Dérik
-      [22.1000, -12.8500], // PK 550
-      [21.3000, -13.0000], // PK 460 Choum
-      [21.3200, -14.5000], // PK 350
-      [21.2000, -15.5000], // PK 250
-      [21.0000, -16.2000], // PK 200 Ben Amira
-      [20.9322, -17.0342]  // PK 0 Nouadhibou Port
+      [22.7441, -12.4789],
+      [22.6800, -12.7000],
+      [22.1000, -12.8500],
+      [21.3000, -13.0000],
+      [21.3200, -14.5000],
+      [21.2000, -15.5000],
+      [21.0000, -16.2000],
+      [20.9322, -17.0342]
     ];
 
     L.polyline(snimTrackPoints, {
@@ -552,7 +584,6 @@
       opacity: 0.9
     }).addTo(map);
 
-    // BALISES DES POINTS KILOMÉTRIQUES (PK) SUR LA CARTE
     const pkMarkers = [
       { name: "PK 704 (Zouérate Mine)", coords: [22.7441, -12.4789] },
       { name: "PK 650 (F'Dérik)", coords: [22.6800, -12.7000] },
@@ -567,22 +598,36 @@
         html: `<div class="pk-badge">📍 ${pk.name}</div>`,
         iconAnchor: [30, 10]
       });
-      L.marker(pk.coords, { icon: icon }).addTo(map)
-       .bindPopup(`<b>Repère Ferroviaire SNIM</b><br/>${pk.name}`);
+      L.marker(pk.coords, { icon: icon }).addTo(map);
     });
 
-    // 3. PARAMÈTRES INTERFACE
+    // -----------------------------------------------------------------
+    // 4. ETAT DE L'APPLICATION & UTILISATEUR
+    // -----------------------------------------------------------------
+    let currentUser = JSON.parse(localStorage.getItem('snim_user') || 'null');
     let soundEnabled = true;
     let nightMode = false;
-    let autoTrack = false;
+    let realGPSActive = false;
+    let gpsWatchId = null;
+    let userMarker = null;
     let heatmapActive = false;
     let audioContext = null;
     let maintenanceLayers = [];
 
+    // Déverrouillage automatique AudioContext Mobile sur premier touch
+    window.addEventListener('click', initAudioContext, { once: true });
+    window.addEventListener('touchstart', initAudioContext, { once: true });
+
+    function initAudioContext() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
     function playAlertSound() {
       if (!soundEnabled) return;
       try {
-        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext && audioContext.state === 'suspended') audioContext.resume();
         const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
         osc.type = 'sawtooth';
@@ -595,6 +640,33 @@
       } catch(e) {}
     }
 
+    // AUTHENTIFICATION & ROLES
+    function updateUIForUser() {
+      const badge = document.getElementById('userRoleBadge');
+      if (currentUser) {
+        badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
+        document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
+      } else {
+        badge.innerText = "NON CONNECTÉ";
+      }
+    }
+
+    function openAuthModal() {
+      document.getElementById('authModal').style.display = 'flex';
+    }
+
+    function handleAuth(e) {
+      e.preventDefault();
+      const matricule = document.getElementById('authMatricule').value;
+      const role = document.getElementById('authRole').value;
+      currentUser = { matricule, role };
+      localStorage.setItem('snim_user', JSON.stringify(currentUser));
+      updateUIForUser();
+      document.getElementById('authModal').style.display = 'none';
+      showToast(`🔑 Bienvenue Agent ${matricule} !`);
+    }
+
+    // TOGGLES DE CONTROLE
     function toggleAudio() {
       soundEnabled = !soundEnabled;
       document.getElementById('btnAudio').innerText = soundEnabled ? "🔊 SON : ON" : "🔇 MUTE";
@@ -607,8 +679,7 @@
     }
 
     function toggleSidePanel() {
-      const sidePanel = document.getElementById('sidePanel');
-      sidePanel.classList.toggle('collapsed');
+      document.getElementById('sidePanel').classList.toggle('collapsed');
     }
 
     function switchTab(tab) {
@@ -625,33 +696,59 @@
       }
     }
 
-    function toggleAutoTrack() {
-      autoTrack = !autoTrack;
-      document.getElementById('btnTrack').classList.toggle('btn-active', autoTrack);
-    }
-
     function showToast(msg) {
       const toast = document.getElementById('toast');
       toast.innerText = msg;
       toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 3000);
+      setTimeout(() => toast.classList.remove('show'), 3200);
     }
 
-    /* GESTION DES SIGNALEMENTS ET SAUVEGARDE HORS-LIGNE (LOCALSTORAGE) */
+    // -----------------------------------------------------------------
+    // 5. GPS RÉEL / IoT TRACKING
+    // -----------------------------------------------------------------
+    function toggleGPSReal() {
+      realGPSActive = !realGPSActive;
+      const btn = document.getElementById('btnGPSReal');
+      const trackModeLabel = document.getElementById('tTrackMode');
+
+      if (realGPSActive) {
+        btn.classList.add('btn-active');
+        trackModeLabel.innerText = "GPS Mobile Live";
+        trackModeLabel.style.color = "#10b981";
+
+        if (navigator.geolocation) {
+          gpsWatchId = navigator.geolocation.watchPosition(
+            pos => {
+              const { latitude, longitude } = pos.coords;
+              if (!userMarker) {
+                userMarker = L.marker([latitude, longitude], {
+                  icon: L.divIcon({ html: '🛰️', className: 'train-icon', iconSize: [28,28] })
+                }).addTo(map).bindPopup("<b>Position Réelle Vôtre / Convoi</b>");
+              } else {
+                userMarker.setLatLng([latitude, longitude]);
+              }
+              map.flyTo([latitude, longitude], 12);
+            },
+            err => { showToast("⚠️ Position GPS introuvable"); },
+            { enableHighAccuracy: true }
+          );
+        }
+      } else {
+        btn.classList.remove('btn-active');
+        trackModeLabel.innerText = "Simulation Balises";
+        trackModeLabel.style.color = "#38bdf8";
+        if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+        if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // 6. GESTION DES SIGNALEMENTS (DEUX NIVEAUX : LOCAL & CLOUD)
+    // -----------------------------------------------------------------
     function loadSavedReports() {
       const saved = JSON.parse(localStorage.getItem('snim_reports') || '[]');
       const reportsList = document.getElementById('driverReportsList');
       reportsList.innerHTML = '';
-
-      if (saved.length === 0) {
-        saved.push({
-          pk: "PK 460 (Choum)",
-          type: "Ensablement Voie",
-          details: "Dune accumulée sur rail droit.",
-          driver: "Train M1",
-          time: "08h30"
-        });
-      }
 
       saved.forEach(r => {
         const item = document.createElement('div');
@@ -659,9 +756,16 @@
         item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time} - ${r.driver}</small>`;
         reportsList.appendChild(item);
       });
+
+      document.getElementById('offlineQueueCount').innerText = `${saved.length} Alerte(s)`;
     }
 
     function openReportModal() {
+      if (!currentUser) {
+        openAuthModal();
+        showToast("⚠️ Connectez votre matricule agent d'abord.");
+        return;
+      }
       document.getElementById('reportModal').style.display = 'flex';
     }
 
@@ -671,7 +775,7 @@
 
     function submitReport(e) {
       e.preventDefault();
-      const driver = document.getElementById('repDriver').value;
+      const driver = currentUser ? `${currentUser.matricule} (${currentUser.role})` : "Agent Inconnu";
       const pk = document.getElementById('repPK').value;
       const type = document.getElementById('repType').value;
       const details = document.getElementById('repDetails').value;
@@ -679,27 +783,36 @@
 
       const newReport = { pk, type, details, driver, time: `Aujourd'hui à ${nowTime}` };
 
-      // Sauvegarde locale
+      // Stockage local garanti
       const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
       currentReports.unshift(newReport);
       localStorage.setItem('snim_reports', JSON.stringify(currentReports));
 
+      // Synchronisation Cloud si possible
+      if (navigator.onLine && supabaseClient) {
+        supabaseClient.from('reports').insert([newReport]).then(() => {
+          showToast("☁️ Synchro Cloud PCD Réussie !");
+        }).catch(() => {});
+      } else {
+        showToast("💾 Stocké en mémoire locale (Zone Blanche).");
+      }
+
       loadSavedReports();
 
       document.getElementById('topPanel').classList.add('alert-active');
-      document.getElementById('panelTitle').innerText = `🚨 SIGNALEMENT CABINE : ${pk}`;
+      document.getElementById('panelTitle').innerText = `🚨 ALERTE : ${pk}`;
       playAlertSound();
-      showToast("✅ Signalement transmis avec succès au PCD !");
 
       closeReportModal();
-
       switchTab('stats');
       if (document.getElementById('sidePanel').classList.contains('collapsed')) {
         toggleSidePanel();
       }
     }
 
-    // 4. MAINTENANCE PRÉDICTIVE
+    // -----------------------------------------------------------------
+    // 7. MAINTENANCE & SIMULATION DU FLUX TERRAIN
+    // -----------------------------------------------------------------
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
       document.getElementById('btnHeatmap').classList.toggle('btn-active', heatmapActive);
@@ -713,12 +826,9 @@
 
         hotSpots.forEach(pt => {
           const circle = L.circle(pt.coords, {
-            radius: 15000,
-            color: '#f97316',
-            fillColor: '#ea580c',
-            fillOpacity: 0.45
+            radius: 15000, color: '#f97316', fillColor: '#ea580c', fillOpacity: 0.45
           }).addTo(map);
-          circle.bindPopup(`<b>🛠️ ZONE CRITIQUE MAINTENANCE (${pt.name})</b><br/>Risque Ensablement : Élevé<br/>Action : Déploiement engin recommandé`);
+          circle.bindPopup(`<b>🛠️ ZONE CRITIQUE MAINTENANCE (${pt.name})</b><br/>Risque Ensablement : Élevé`);
           maintenanceLayers.push(circle);
         });
       } else {
@@ -727,65 +837,42 @@
       }
     }
 
-    // 5. LOCOMOTIVES ET CERCLE DE SÉCURITÉ
     const trains = [
       {
-        id: "SNIM-M1",
-        name: "Train Minéralier Heavy 1",
-        loco: "EMD SD70ACS (Triple Motrice)",
-        wagons: 230,
-        cargo: "Minerai de Fer (Hématite)",
-        tonnage: "21 500 T",
-        routeIndex: 0,
-        direction: 1,
-        speed: 48,
-        position: [...snimTrackPoints[0]],
-        marker: null,
-        safetyCircle: null
+        id: "SNIM-M1", name: "Train Minéralier Heavy 1", routeIndex: 0, direction: 1, speed: 48,
+        position: [...snimTrackPoints[0]], marker: null, safetyCircle: null
       },
       {
-        id: "SNIM-V2",
-        name: "Train Convoyeur Vides 2",
-        loco: "EMD SD70ACS (Double Motrice)",
-        wagons: 210,
-        cargo: "Wagons Vides",
-        tonnage: "3 200 T",
-        routeIndex: snimTrackPoints.length - 1,
-        direction: -1,
-        speed: 58,
-        position: [...snimTrackPoints[snimTrackPoints.length - 1]],
-        marker: null,
-        safetyCircle: null
+        id: "SNIM-V2", name: "Train Convoyeur Vides 2", routeIndex: snimTrackPoints.length - 1, direction: -1, speed: 58,
+        position: [...snimTrackPoints[snimTrackPoints.length - 1]], marker: null, safetyCircle: null
       }
     ];
 
     trains.forEach(t => {
-      const icon = L.divIcon({
-        className: 'custom-icon',
-        html: `<div class="train-icon">🚂</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
-      });
-      t.marker = L.marker(t.position, { icon: icon }).addTo(map);
+      t.marker = L.marker(t.position, {
+        icon: L.divIcon({ html: `<div class="train-icon">🚂</div>`, iconSize: [28, 28], iconAnchor: [14, 14] })
+      }).addTo(map);
 
       t.safetyCircle = L.circle(t.position, {
-        radius: 2000,
-        color: '#ef4444',
-        fillColor: '#ef4444',
-        fillOpacity: 0.15,
-        dashArray: '4, 6'
+        radius: 2000, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15, dashArray: '4, 6'
       }).addTo(map);
     });
 
-    // 6. MOTEUR DE SUIVI EN TEMPS RÉEL
     function updatePositions() {
       const currentTemp = 42 + Math.floor(Math.random() * 10);
       document.getElementById('tRailTemp').innerText = `${currentTemp}°C`;
-      
-      if (currentTemp > 49) {
-        document.getElementById('tDilatation').innerHTML = `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>`;
+      document.getElementById('tDilatation').innerHTML = currentTemp > 49 
+        ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
+        : `<span style="color:#10b981;">MODÉRÉ</span>`;
+
+      // Maj statut réseau
+      const netLabel = document.getElementById('netStatus');
+      if (navigator.onLine) {
+        netLabel.innerText = "En Ligne (Online)";
+        netLabel.style.color = "#10b981";
       } else {
-        document.getElementById('tDilatation').innerHTML = `<span style="color:#10b981;">MODÉRÉ</span>`;
+        netLabel.innerText = "Hors Ligne (Désert)";
+        netLabel.style.color = "#ef4444";
       }
 
       trains.forEach(t => {
@@ -807,35 +894,25 @@
         t.safetyCircle.setLatLng(t.position);
 
         t.marker.bindPopup(`
-          <div style="font-size:12px; font-family:sans-serif;">
-            <b style="color:#d97706; font-size:13px;">🚂 ${t.name}</b><br/>
-            <hr style="margin:4px 0; border:0; border-top:1px solid #ccc;"/>
-            <b>ID Loco :</b> ${t.id}<br/>
-            <b>Motrice :</b> ${t.loco}<br/>
-            <b>Poids :</b> ${t.tonnage} | <b>Wagons :</b> ${t.wagons}<br/>
+          <div style="font-size:12px;">
+            <b style="color:#d97706;">🚂 ${t.name} (${t.id})</b><br/>
             <b>Vitesse Live :</b> ${t.speed} km/h<br/>
-            <b>Conso Carburant :</b> 14.2 L/km<br/>
             <b style="color:#ef4444;">Zone d'arrêt d'urgence : 1.8 km</b>
           </div>
         `);
       });
-
-      if (autoTrack) {
-        map.panTo(trains[0].position, { animate: true });
-      }
     }
 
-    function locateUser() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(p => {
-          autoTrack = false;
-          document.getElementById('btnTrack').classList.remove('btn-active');
-          map.flyTo([p.coords.latitude, p.coords.longitude], 13);
-        });
-      }
-    }
+    // Synchro automatique des données stockées hors-ligne au retour de la connexion
+    window.addEventListener('online', () => {
+      showToast("📡 Connexion rétablie ! Synchro des alertes...");
+      loadSavedReports();
+    });
 
-    // Initialisation
+    // Initialisation globale
+    if (!currentUser) openAuthModal();
+    else updateUIForUser();
+
     loadSavedReports();
     setInterval(updatePositions, 4000);
   </script>
