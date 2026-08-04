@@ -520,10 +520,10 @@
 
   <script>
     // -----------------------------------------------------------------
-    // 1. SERVICES CLOUD & PERSISTANCE DUAL-MODE (Offline/Online Sync)
+    // 1. SERVICES CLOUD & PERSISTANCE SUPABASE (Online/Offline Sync)
     // -----------------------------------------------------------------
-    const SUPABASE_URL = "https://xyzcompany.supabase.co"; // URL Supabase (Emplacement générique)
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+    const SUPABASE_URL = "https://ggbyxzeexmwtonqmao.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdnYnl4emVleGV4bXd0b25xbWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NjM5OTYsImV4cCI6MjEwMTQzOTk5Nn0.cc7MSLDhGuvkEW8M4iAkls312IyVoaToDvWQ0gow1dw";
     let supabaseClient = null;
 
     try {
@@ -745,19 +745,45 @@
     // -----------------------------------------------------------------
     // 6. GESTION DES SIGNALEMENTS (DEUX NIVEAUX : LOCAL & CLOUD)
     // -----------------------------------------------------------------
-    function loadSavedReports() {
-      const saved = JSON.parse(localStorage.getItem('snim_reports') || '[]');
+    async function loadSavedReports() {
       const reportsList = document.getElementById('driverReportsList');
       reportsList.innerHTML = '';
 
-      saved.forEach(r => {
+      let reportsToDisplay = [];
+
+      if (navigator.onLine && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('reports')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            reportsToDisplay = data.map(r => ({
+              pk: r.pk,
+              type: r.type,
+              details: r.details,
+              driver: 'Agent SNIM',
+              time: new Date(r.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            }));
+          }
+        } catch(err) {
+          console.warn("Récupération Cloud échouée, passage sur le LocalStorage.");
+        }
+      }
+
+      if (reportsToDisplay.length === 0) {
+        reportsToDisplay = JSON.parse(localStorage.getItem('snim_reports') || '[]');
+      }
+
+      reportsToDisplay.forEach(r => {
         const item = document.createElement('div');
         item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0;";
-        item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time} - ${r.driver}</small>`;
+        item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time || ''} - ${r.driver || ''}</small>`;
         reportsList.appendChild(item);
       });
 
-      document.getElementById('offlineQueueCount').innerText = `${saved.length} Alerte(s)`;
+      document.getElementById('offlineQueueCount').innerText = `${reportsToDisplay.length} Alerte(s)`;
     }
 
     function openReportModal() {
@@ -773,7 +799,7 @@
       document.getElementById('reportModal').style.display = 'none';
     }
 
-    function submitReport(e) {
+    async function submitReport(e) {
       e.preventDefault();
       const driver = currentUser ? `${currentUser.matricule} (${currentUser.role})` : "Agent Inconnu";
       const pk = document.getElementById('repPK').value;
@@ -788,11 +814,18 @@
       currentReports.unshift(newReport);
       localStorage.setItem('snim_reports', JSON.stringify(currentReports));
 
-      // Synchronisation Cloud si possible
+      // Synchronisation Cloud Supabase
       if (navigator.onLine && supabaseClient) {
-        supabaseClient.from('reports').insert([newReport]).then(() => {
-          showToast("☁️ Synchro Cloud PCD Réussie !");
-        }).catch(() => {});
+        try {
+          const { error } = await supabaseClient.from('reports').insert([{ pk: pk, type: type, details: details }]);
+          if (!error) {
+            showToast("☁️ Synchro Cloud PCD Réussie !");
+          } else {
+            showToast("💾 Stocké en local (Erreur Cloud).");
+          }
+        } catch(err) {
+          showToast("💾 Stocké en mémoire locale.");
+        }
       } else {
         showToast("💾 Stocké en mémoire locale (Zone Blanche).");
       }
