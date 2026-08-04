@@ -204,17 +204,18 @@
       filter: drop-shadow(0 0 6px rgba(0,0,0,0.9));
     }
 
-    /* Badges Points Kilométriques */
+    /* Badges Points Kilométriques avec contraste amélioré */
     .pk-badge {
-      background: #0f172a;
+      background: rgba(15, 23, 42, 0.95);
       border: 1px solid #f59e0b;
       color: #f59e0b;
       font-size: 10px;
       font-weight: bold;
-      padding: 2px 5px;
-      border-radius: 4px;
+      padding: 3px 6px;
+      border-radius: 6px;
       white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.8);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.9);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
     }
 
     /* Fenêtre Modale de Signalement Conducteur */
@@ -298,6 +299,30 @@
       cursor: pointer;
     }
 
+    /* Notification Toast Feedback UX */
+    .toast-notification {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #10b981;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      z-index: 3000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+    }
+
+    .toast-notification.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     /* Barres d'Analytics */
     .stat-bar-container {
       background: #1e293b;
@@ -321,6 +346,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Toast de notification UX -->
+  <div class="toast-notification" id="toast">✅ Signalement transmis avec succès au PCD !</div>
 
   <!-- Panneau Supérieur -->
   <div class="top-panel" id="topPanel">
@@ -384,7 +412,7 @@
       <div class="telemetry-section">
         <div class="telemetry-title">📡 RACCORDEMENT TERRAIN</div>
         <div class="telemetry-item"><span>Liaison Satellite/4G :</span><span class="telemetry-value" style="color:#10b981;">En Ligne (Online)</span></div>
-        <div class="telemetry-item"><span>Synchro Hors-Ligne :</span><span class="telemetry-value">Prête</span></div>
+        <div class="telemetry-item"><span>Synchro Hors-Ligne :</span><span class="telemetry-value" style="color:#10b981;">Active (Storage OK)</span></div>
       </div>
     </div>
 
@@ -414,12 +442,7 @@
 
       <div class="telemetry-section">
         <div class="telemetry-title">📢 DERNIERS SIGNALEMENTS CONDUCTEURS</div>
-        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1;">
-          <div style="border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0;">
-            <b style="color:#f59e0b;">PK 460 - Choum</b> | Dune accumulée sur rail droit.<br/>
-            <small style="color:#64748b;">Aujourd'hui à 08h30 - Train M1</small>
-          </div>
-        </div>
+        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1;"></div>
       </div>
     </div>
 
@@ -455,10 +478,10 @@
         <div class="form-group">
           <label>Type d'incident :</label>
           <select id="repType">
-            <option value="Dune / Ensablement Majeur">🐫 Ensablement de la voie (Dune)</option>
-            <option value="Dromadaires sur la voie">🐪 Dromadaires proches/sur les rails</option>
-            <option value="Anomalie Rail / Flambement">🛤️ Anomalie de structure / Rail chaud</option>
-            <option value="Problème Mécanique Motrice">🔧 Panne / Problème mécanique</option>
+            <option value="Ensablement de la voie (Dune)">🐫 Ensablement de la voie (Dune)</option>
+            <option value="Dromadaires proches/sur les rails">🐪 Dromadaires proches/sur les rails</option>
+            <option value="Anomalie de structure / Rail chaud">🛤️ Anomalie de structure / Rail chaud</option>
+            <option value="Panne / Problème mécanique">🔧 Panne / Problème mécanique</option>
           </select>
         </div>
 
@@ -587,7 +610,38 @@
       document.getElementById('btnTrack').classList.toggle('btn-active', autoTrack);
     }
 
-    /* GESTION DE LA MODALE DE SIGNALEMENT */
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    /* GESTION DES SIGNALEMENTS ET SAUVEGARDE HORS-LIGNE (LOCALSTORAGE) */
+    function loadSavedReports() {
+      const saved = JSON.parse(localStorage.getItem('snim_reports') || '[]');
+      const reportsList = document.getElementById('driverReportsList');
+      reportsList.innerHTML = '';
+
+      if (saved.length === 0) {
+        // Incident par défaut si vide
+        saved.push({
+          pk: "PK 460 (Choum)",
+          type: "Ensablement Voie",
+          details: "Dune accumulée sur rail droit.",
+          driver: "Train M1",
+          time: "08h30"
+        });
+      }
+
+      saved.forEach(r => {
+        const item = document.createElement('div');
+        item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0;";
+        item.innerHTML = `<b style="color:#ef4444;">${r.pk}</b> | ${r.type} (${r.details || 'Aucune précision'})<br/><small style="color:#64748b;">${r.time} - ${r.driver}</small>`;
+        reportsList.appendChild(item);
+      });
+    }
+
     function openReportModal() {
       document.getElementById('reportModal').style.display = 'flex';
     }
@@ -602,22 +656,27 @@
       const pk = document.getElementById('repPK').value;
       const type = document.getElementById('repType').value;
       const details = document.getElementById('repDetails').value;
+      const nowTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-      // Ajout dynamique dans la liste d'analytics
-      const reportsList = document.getElementById('driverReportsList');
-      const newReport = document.createElement('div');
-      newReport.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0;";
-      newReport.innerHTML = `<b style="color:#ef4444;">${pk}</b> | ${type} (${details || 'Aucune précision'})<br/><small style="color:#64748b;">Signalé à l'instant par ${driver}</small>`;
-      reportsList.insertBefore(newReport, reportsList.firstChild);
+      const newReport = { pk, type, details, driver, time: `Aujourd'hui à ${nowTime}` };
 
-      // Notification visuelle
+      // Sauvegarde locale (Persistance Hors-Ligne)
+      const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
+      currentReports.unshift(newReport);
+      localStorage.setItem('snim_reports', JSON.stringify(currentReports));
+
+      // Recharger la liste
+      loadSavedReports();
+
+      // Notification visuelle & sonore
       document.getElementById('topPanel').classList.add('alert-active');
       document.getElementById('panelTitle').innerText = `🚨 SIGNALEMENT CABINE : ${pk}`;
       playAlertSound();
+      showToast("✅ Signalement transmis avec succès au PCD !");
 
       closeReportModal();
 
-      // Basculer vers l'onglet analytics pour montrer le résultat
+      // Basculer vers l'onglet analytics pour voir le résultat
       switchTab('stats');
       if (document.getElementById('sidePanel').classList.contains('collapsed')) {
         toggleSidePanel();
@@ -760,6 +819,8 @@
       }
     }
 
+    // Initialisation
+    loadSavedReports();
     setInterval(updatePositions, 4000);
   </script>
 </body>
