@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Radar Ferroviaire SNIM Live</title>
+  <title>PCD - SNIM Command Center</title>
   
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -20,10 +20,15 @@
     html, body, #map {
       width: 100%;
       height: 100%;
-      background: #0b0f19;
+      background: #090d16;
     }
 
-    /* Panneau supérieur avec support d'alerte rouge clignotant */
+    /* Mode Nuit Radar / Infrarouge Tactical */
+    .night-mode {
+      filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%);
+    }
+
+    /* Panneau Supérieur */
     .top-panel {
       position: absolute;
       top: 10px;
@@ -41,11 +46,10 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-      transition: background 0.3s, border-color 0.3s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      transition: all 0.3s ease;
     }
 
-    /* Animation Clignotement en cas d'obstacle */
     .top-panel.alert-active {
       animation: alertFlash 0.8s infinite alternate;
     }
@@ -54,12 +58,11 @@
       from {
         background: rgba(220, 38, 38, 0.95);
         border-color: #ef4444;
-        box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+        box-shadow: 0 0 25px rgba(239, 68, 68, 0.9);
       }
       to {
         background: rgba(15, 23, 42, 0.95);
         border-color: rgba(245, 158, 11, 0.5);
-        box-shadow: 0 4px 20px rgba(0,0,0,0.6);
       }
     }
 
@@ -101,14 +104,63 @@
       gap: 4px;
     }
 
-    .btn-gps { background: #059669; }
-    .btn-track { background: #d97706; }
-    .btn-track.active { background: #dc2626; border-color: #f87171; }
+    .btn-active { background: #d97706 !important; }
+
+    /* Panneau Télémétrique Latéral Rétractable */
+    .side-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      z-index: 1000;
+      width: 280px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 12px;
+      color: white;
+      padding: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .side-panel.collapsed {
+      transform: translateX(-300px);
+    }
+
+    .side-toggle-btn {
+      position: absolute;
+      right: -36px;
+      top: 10px;
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 0 8px 8px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .telemetry-item {
+      margin-top: 8px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 4px;
+    }
+
+    .telemetry-value {
+      font-weight: bold;
+      color: #38bdf8;
+    }
 
     .train-icon {
-      font-size: 22px;
-      line-height: 1;
-      filter: drop-shadow(0 0 4px rgba(0,0,0,0.8));
+      font-size: 24px;
+      filter: drop-shadow(0 0 6px rgba(0,0,0,0.9));
     }
 
     @keyframes blink {
@@ -119,26 +171,56 @@
 </head>
 <body>
 
+  <!-- Panneau supérieur de contrôle -->
   <div class="top-panel" id="topPanel">
     <div class="brand">
-      <div class="pulse" id="statusPulse"></div>
-      <span id="panelTitle">RADAR SNIM LIVE</span>
+      <div class="pulse"></div>
+      <span id="panelTitle">PCD SNIM - SATELLITE LIVE</span>
     </div>
     <div class="controls">
-      <button class="btn btn-gps" onclick="locateUser()">🎯 MA POSITION</button>
-      <button class="btn btn-track" id="btnAutoTrack" onclick="toggleAutoTrack()">🎥 SUIVI AUTO: OFF</button>
+      <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
+      <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
+      <button class="btn" id="btnTrack" onclick="toggleAutoTrack()">🎥 SUIVI</button>
+      <button class="btn" onclick="locateUser()">🎯 GPS</button>
+    </div>
+  </div>
+
+  <!-- Panneau Télémétrique Latéral Rétractable -->
+  <div class="side-panel" id="sidePanel">
+    <button class="side-toggle-btn" onclick="toggleSidePanel()">📊</button>
+    <h4 style="color:#f59e0b; font-size:13px; margin-bottom:8px;">📊 TÉLÉMÉTRIE RÉSEAU SNIM</h4>
+    
+    <div class="telemetry-item">
+      <span>Trains actifs :</span>
+      <span class="telemetry-value" id="tActive">2 Locomotives</span>
+    </div>
+    <div class="telemetry-item">
+      <span>Vitesse moyenne flotte :</span>
+      <span class="telemetry-value" id="tAvgSpeed">52 km/h</span>
+    </div>
+    <div class="telemetry-item">
+      <span>Tonnage total (24h) :</span>
+      <span class="telemetry-value">44 700 Tonnes</span>
+    </div>
+    <div class="telemetry-item">
+      <span>Destination Port :</span>
+      <span class="telemetry-value">Nouadhibou</span>
+    </div>
+    <div class="telemetry-item">
+      <span>ETA Estimé Arrivée :</span>
+      <span class="telemetry-value" id="tETA">04h 25m</span>
     </div>
   </div>
 
   <div id="map"></div>
 
   <script>
-    // 1. CARTE SATELLITE ARCGIS HD
+    // 1. CARTE SATELLITE ARCGIS HD EN DIRECT
     const map = L.map('map', { zoomControl: false }).setView([21.3000, -14.5000], 7);
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: 'ArcGIS Satellite'
+      attribution: 'ArcGIS Satellite HD'
     }).addTo(map);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
@@ -146,16 +228,16 @@
       subdomains: 'abcd'
     }).addTo(map);
 
-    // 2. TRACÉ EXACT DE LA VOIE FERRÉE SNIM (704 KM)
+    // 2. VOIE FERRÉE SNIM
     const snimTrackPoints = [
-      [22.7441, -12.4789], // Zouérate (Mines)
+      [22.7441, -12.4789], // Zouérate
       [22.6800, -12.7000], // F'Dérik
       [22.1000, -12.8500], 
       [21.3000, -13.0000], // Choum
-      [21.3200, -14.5000], // Pass de Choum
+      [21.3200, -14.5000], 
       [21.2000, -15.5000], 
       [21.0000, -16.2000], // Ben Amira
-      [20.9322, -17.0342]  // Nouadhibou (Port Minéralier)
+      [20.9322, -17.0342]  // Nouadhibou Port
     ];
 
     L.polyline(snimTrackPoints, {
@@ -163,188 +245,153 @@
       weight: 5,
       dashArray: '8, 10',
       opacity: 0.9
-    }).addTo(map).bindPopup("<b>Réseau Ferroviaire SNIM</b><br/>Ligne Zouérate ↔ Nouadhibou (704 km)");
+    }).addTo(map);
 
-    // 3. FLOTTE DE LOCOMOTIVES EN CIRCULATION REAL-TIME
+    // 3. PARAMÈTRES AVANCÉS & AUDIO
+    let soundEnabled = true;
+    let nightMode = false;
     let autoTrack = false;
     let audioContext = null;
 
+    function playAlertSound() {
+      if (!soundEnabled) return;
+      try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(900, audioContext.currentTime);
+        gain.gain.setValueAtTime(0.25, audioContext.currentTime);
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.35);
+      } catch(e) {}
+    }
+
+    function toggleAudio() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('btnAudio').innerText = soundEnabled ? "🔊 SON : ON" : "🔇 MUTE";
+    }
+
+    function toggleNightMode() {
+      nightMode = !nightMode;
+      const mapDiv = document.getElementById('map');
+      if (nightMode) {
+        mapDiv.classList.add('night-mode');
+        document.getElementById('btnNight').classList.add('btn-active');
+      } else {
+        mapDiv.classList.remove('night-mode');
+        document.getElementById('btnNight').classList.remove('btn-active');
+      }
+    }
+
+    function toggleSidePanel() {
+      document.getElementById('sidePanel').classList.toggle('collapsed');
+    }
+
+    function toggleAutoTrack() {
+      autoTrack = !autoTrack;
+      document.getElementById('btnTrack').classList.toggle('btn-active', autoTrack);
+    }
+
+    // 4. LOCOMOTIVES EN CIRCULATION
     const trains = [
       {
         id: "SNIM-M1",
-        name: "Train Minéralier Heavy 1",
-        loco: "EMD SD70ACS (Triple Motrice)",
+        name: "Minéralier Heavy 1",
+        loco: "EMD SD70ACS",
         wagons: 230,
-        cargo: "Minerai de Fer (Hématite)",
-        tonnage: "21 500 Tonnes",
+        tonnage: "21 500 T",
         routeIndex: 0,
-        direction: 1, // Descendant (Zouérate -> Nouadhibou)
+        direction: 1,
         speed: 48,
         position: [...snimTrackPoints[0]],
         marker: null
       },
       {
         id: "SNIM-V2",
-        name: "Train Retour Vides",
-        loco: "EMD SD70ACS (Double Motrice)",
+        name: "Train Convoyeur 2",
+        loco: "EMD SD70ACS",
         wagons: 210,
-        cargo: "Wagons Vides + Approvisionnement",
-        tonnage: "3 200 Tonnes",
+        tonnage: "3 200 T",
         routeIndex: snimTrackPoints.length - 1,
-        direction: -1, // Remontant (Nouadhibou -> Zouérate)
-        speed: 60,
+        direction: -1,
+        speed: 58,
         position: [...snimTrackPoints[snimTrackPoints.length - 1]],
         marker: null
       }
     ];
 
-    // Création des marqueurs de trains
     trains.forEach(t => {
       const icon = L.divIcon({
         className: 'custom-icon',
         html: `<div class="train-icon">🚂</div>`,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
       });
-
       t.marker = L.marker(t.position, { icon: icon }).addTo(map);
     });
 
-    // Syntétiseur Audio pour le Bip d'alerte obstacle
-    function playAlertBeep() {
-      try {
-        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(880, audioContext.currentTime); // Note A5
-        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-        osc.connect(gain);
-        gain.connect(audioContext.destination);
-        osc.start();
-        osc.stop(audioContext.currentTime + 0.4);
-      } catch(e) {}
-    }
+    // 5. BOUCLE DE SUIVI ET TÉLÉMÉTRIE
+    function updateFleet() {
+      let hasAlert = false;
 
-    // 4. MOTEUR DE DÉPLACEMENT ET DÉTECTION D'OBSTACLES
-    function updateTrainPositions() {
-      let hasGlobalAlert = false;
-      let alertMsg = "";
+      trains.forEach(t => {
+        t.routeIndex += t.direction * 0.12;
 
-      trains.forEach((t, index) => {
-        // Avancer sur le tracé
-        t.routeIndex += t.direction * 0.15;
+        if (t.routeIndex >= snimTrackPoints.length - 1) { t.direction = -1; t.routeIndex = snimTrackPoints.length - 1; }
+        else if (t.routeIndex <= 0) { t.direction = 1; t.routeIndex = 0; }
 
-        // Gestion des terminus
-        if (t.routeIndex >= snimTrackPoints.length - 1) {
-          t.direction = -1;
-          t.routeIndex = snimTrackPoints.length - 1;
-        } else if (t.routeIndex <= 0) {
-          t.direction = 1;
-          t.routeIndex = 0;
-        }
+        const idx = Math.floor(t.routeIndex);
+        const nextIdx = Math.min(idx + 1, snimTrackPoints.length - 1);
+        const ratio = t.routeIndex - idx;
 
-        // Interpolation de la position
-        const idxLow = Math.floor(t.routeIndex);
-        const idxHigh = Math.min(idxLow + 1, snimTrackPoints.length - 1);
-        const ratio = t.routeIndex - idxLow;
+        const p1 = snimTrackPoints[idx];
+        const p2 = snimTrackPoints[nextIdx];
 
-        const p1 = snimTrackPoints[idxLow];
-        const p2 = snimTrackPoints[idxHigh];
-
-        const currentLat = p1[0] + (p2[0] - p1[0]) * ratio;
-        const currentLng = p1[1] + (p2[1] - p1[1]) * ratio;
-        
-        t.position = [currentLat, currentLng];
+        t.position = [p1[0] + (p2[0] - p1[0]) * ratio, p1[1] + (p2[1] - p1[1]) * ratio];
         t.marker.setLatLng(t.position);
 
-        // Simulation aléatoire d'obstacle sur la trajectoire (1 chance sur 4)
-        const obstacleDetected = Math.random() < 0.25;
-        let statusHTML = `<span style="color:#10b981; font-weight:bold;">✅ Voie Libre - Trajectoire dégagée</span>`;
-        
-        if (obstacleDetected) {
-          hasGlobalAlert = true;
-          const cause = Math.random() > 0.5 ? "Ensablement majeur de la voie" : "Présence de bétail / dromadaires sur les rails";
-          statusHTML = `<span style="color:#ef4444; font-weight:bold;">⚠️ ALERTE OBSTACLE : ${cause} !</span>`;
-          alertMsg = `${t.id} : ${cause}`;
-        }
+        const isObstacle = Math.random() < 0.2;
+        if (isObstacle) hasAlert = true;
 
-        // Contenu de la popup avec détails de la cargaison
         t.marker.bindPopup(`
-          <div style="font-family: sans-serif; font-size: 13px; color: #0f172a; min-width: 200px;">
-            <strong style="color: #d97706; font-size: 14px;">🚂 ${t.name} (${t.id})</strong><br/>
-            <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;"/>
-            <b>Locomotive :</b> ${t.loco}<br/>
-            <b>Cargaison :</b> ${t.cargo}<br/>
-            <b>Wagons :</b> ${t.wagons} wagons<br/>
-            <b>Tonnage Total :</b> ${t.tonnage}<br/>
-            <b>Vitesse Live :</b> ${t.speed} km/h<br/>
-            <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;"/>
-            <b>État Voie :</b> ${statusHTML}
+          <div style="font-size:12px;">
+            <b style="color:#d97706;">🚂 ${t.name} (${t.id})</b><br/>
+            <b>Wagons :</b> ${t.wagons} | <b>Poids :</b> ${t.tonnage}<br/>
+            <b>Vitesse :</b> ${t.speed} km/h<br/>
+            <b>État Voie :</b> ${isObstacle ? '<span style="color:red;">⚠️ ALERTE ENSABLEMENT</span>' : '<span style="color:green;">✅ Dégagée</span>'}
           </div>
         `);
       });
 
-      // Gestion des alertes globales et animations UI
       const topPanel = document.getElementById('topPanel');
-      const panelTitle = document.getElementById('panelTitle');
-
-      if (hasGlobalAlert) {
+      if (hasAlert) {
         topPanel.classList.add('alert-active');
-        panelTitle.innerText = `🚨 OBSTACLE DÉTECTÉ !`;
-        playAlertBeep();
+        document.getElementById('panelTitle').innerText = "🚨 ALERTE OBSTACLE VOIE !";
+        playAlertSound();
       } else {
         topPanel.classList.remove('alert-active');
-        panelTitle.innerText = `RADAR SNIM LIVE`;
+        document.getElementById('panelTitle').innerText = "PCD SNIM - SATELLITE LIVE";
       }
 
-      // 5. RECENTRAGE DYNAMIQUE AUTOMATIQUE (SUR LE TRAIN 1)
       if (autoTrack) {
-        map.panTo(trains[0].position, { animate: true, duration: 1.0 });
+        map.panTo(trains[0].position, { animate: true });
       }
     }
 
-    function toggleAutoTrack() {
-      autoTrack = !autoTrack;
-      const btn = document.getElementById('btnAutoTrack');
-      if (autoTrack) {
-        btn.classList.add('active');
-        btn.innerText = "🎥 SUIVI AUTO: ON";
-        map.flyTo(trains[0].position, 10);
-      } else {
-        btn.classList.remove('active');
-        btn.innerText = "🎥 SUIVI AUTO: OFF";
-      }
-    }
-
-    // 6. GEOLOCALISATION UTILISATEUR
-    let userMarker = null;
     function locateUser() {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
+        navigator.geolocation.getCurrentPosition(p => {
           autoTrack = false;
-          document.getElementById('btnAutoTrack').classList.remove('active');
-          document.getElementById('btnAutoTrack').innerText = "🎥 SUIVI AUTO: OFF";
-
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-
-          if (userMarker) map.removeLayer(userMarker);
-          userMarker = L.circleMarker([lat, lng], {
-            radius: 9,
-            color: '#ffffff',
-            fillColor: '#059669',
-            fillOpacity: 1
-          }).addTo(map);
-
-          userMarker.bindPopup("<b>📍 Votre Emplacement</b>").openPopup();
-          map.flyTo([lat, lng], 13);
+          document.getElementById('btnTrack').classList.remove('btn-active');
+          map.flyTo([p.coords.latitude, p.coords.longitude], 13);
         });
       }
     }
 
-    // Boucle d'actualisation de la télémétrie ferroviaire
-    setInterval(updateTrainPositions, 4000);
+    setInterval(updateFleet, 4000);
   </script>
 </body>
 </html>
