@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Radar Satellite Live</title>
   
-  <!-- Moteur Leaflet (Ultra léger & ultra rapide sur mobile) -->
+  <!-- Moteur Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -23,7 +23,6 @@
       background: #0b0f19;
     }
 
-    /* Barre supérieure */
     .top-panel {
       position: absolute;
       top: 10px;
@@ -76,12 +75,12 @@
       cursor: pointer;
     }
 
-    /* Marqueurs d'avions */
-    .plane-icon {
-      color: #facc15;
-      font-size: 16px;
-      text-shadow: 0 0 3px #000;
-      transition: transform 0.3s ease;
+    .plane-marker {
+      font-size: 18px;
+      line-height: 1;
+      text-shadow: 0 0 4px #000;
+      display: inline-block;
+      transition: transform 0.4s ease-out;
     }
 
     @keyframes blink {
@@ -106,16 +105,14 @@
   <div id="map"></div>
 
   <script>
-    // Initialisation de la carte centrée sur le monde
+    // Carte satellite ArcGIS
     const map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
 
-    // Couche Satellite HD Monde (ArcGIS Satellite)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
       attribution: 'ArcGIS Satellite'
     }).addTo(map);
 
-    // Repères des noms de villes & pays superposés
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
@@ -123,47 +120,46 @@
 
     const markersGroup = L.layerGroup().addTo(map);
 
-    // Récupération des avions réels
     async function fetchLiveFlights() {
       try {
-        const res = await fetch('https://opensky-network.org/api/states/all');
+        // API OpenSky avec contournement CORS pour mobile
+        const targetUrl = 'https://opensky-network.org/api/states/all';
+        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+        
+        const res = await fetch(proxyUrl);
         const data = await res.json();
 
         if (data && data.states) {
           markersGroup.clearLayers();
 
-          // On filtre les vols valides (limité à 300 pour la vitesse sur téléphone)
           const flights = data.states
             .filter(f => f[5] !== null && f[6] !== null)
-            .slice(0, 350);
+            .slice(0, 400);
 
           document.getElementById('flightCount').innerText = flights.length;
 
           flights.forEach(flight => {
-            const callsign = flight[1] ? flight[1].trim() : 'INCONNU';
-            const country = flight[2];
+            const callsign = flight[1] ? flight[1].trim() : 'N/A';
+            const country = flight[2] || 'Inconnu';
             const lon = flight[5];
             const lat = flight[6];
-            const alt = flight[7] ? Math.round(flight[7]) + ' m' : 'N/A';
+            const alt = flight[7] ? Math.round(flight[7]) + ' m' : 'Sol';
             const speed = flight[9] ? Math.round(flight[9] * 3.6) : 0;
             const heading = flight[10] || 0;
 
-            // Création de l'icône d'avion orientée selon son cap
             const icon = L.divIcon({
-              className: 'custom-plane-icon',
-              html: `<div class="plane-icon" style="transform: rotate(${heading}deg);">✈</div>`,
+              className: 'custom-icon',
+              html: `<div class="plane-marker" style="transform: rotate(${heading - 45}deg);">✈️</div>`,
               iconSize: [20, 20],
               iconAnchor: [10, 10]
             });
 
-            // Ajout du marqueur sur la carte satellite
             const marker = L.marker([lat, lon], { icon: icon });
 
-            // Fenêtre d'information au clic
             marker.bindPopup(`
-              <div style="font-family: sans-serif; font-size: 13px;">
-                <strong style="color: #0284c7; font-size: 14px;">VOL ${callsign}</strong><br/>
-                <b>Pays :</b> ${country}<br/>
+              <div style="font-family: sans-serif; font-size: 13px; color: #0f172a;">
+                <strong style="color: #0284c7; font-size: 14px;">✈️ VOL ${callsign}</strong><br/>
+                <b>Origine :</b> ${country}<br/>
                 <b>Altitude :</b> ${alt}<br/>
                 <b>Vitesse :</b> ${speed} km/h<br/>
                 <b>Cap :</b> ${heading}°
@@ -174,11 +170,10 @@
           });
         }
       } catch (err) {
-        console.error("Erreur de récupération des données :", err);
+        console.error("Erreur de récupération :", err);
       }
     }
 
-    // Chargement au démarrage + mise à jour auto toutes les 15s
     fetchLiveFlights();
     setInterval(fetchLiveFlights, 15000);
   </script>
