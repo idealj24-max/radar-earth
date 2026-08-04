@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCD - SNIM Radar Command Center</title>
+  <title>PCD - SNIM Satellite Radar & AI Detection</title>
   
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -112,7 +112,7 @@
       bottom: 25px;
       left: 10px;
       z-index: 1000;
-      width: 270px;
+      width: 280px;
       background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(56, 189, 248, 0.4);
@@ -124,7 +124,7 @@
     }
 
     .side-panel.collapsed {
-      transform: translateX(-290px);
+      transform: translateX(-300px);
     }
 
     .side-toggle-btn {
@@ -175,7 +175,7 @@
   <div class="top-panel" id="topPanel">
     <div class="brand">
       <div class="pulse"></div>
-      <span id="panelTitle">PCD SNIM - SATELLITE LIVE</span>
+      <span id="panelTitle">PCD SNIM - RADAR SATELLITE</span>
     </div>
     <div class="controls">
       <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
@@ -188,14 +188,18 @@
   <!-- Panneau Télémétrique Latéral Rétractable -->
   <div class="side-panel" id="sidePanel">
     <button class="side-toggle-btn" onclick="toggleSidePanel()">📊</button>
-    <h4 style="color:#f59e0b; font-size:13px; margin-bottom:8px;">📊 TÉLÉMÉTRIE RÉSEAU SNIM</h4>
+    <h4 style="color:#f59e0b; font-size:13px; margin-bottom:8px;">📊 TÉLÉMÉTRIE SATELLITE SNIM</h4>
     
     <div class="telemetry-item">
-      <span>Locomotives Actives :</span>
+      <span>Analyse Cartographique :</span>
+      <span class="telemetry-value" style="color:#10b981;">🛰️ Satellite Actif</span>
+    </div>
+    <div class="telemetry-item">
+      <span>Locomotives Détectées :</span>
       <span class="telemetry-value" id="tActive">2 En Circulation</span>
     </div>
     <div class="telemetry-item">
-      <span>Vitesse Moyenne :</span>
+      <span>Vitesse Moyenne Flotte :</span>
       <span class="telemetry-value" id="tAvgSpeed">52 km/h</span>
     </div>
     <div class="telemetry-item">
@@ -203,23 +207,19 @@
       <span class="telemetry-value">21 500 Tonnes</span>
     </div>
     <div class="telemetry-item">
-      <span>Total Wagons :</span>
-      <span class="telemetry-value">440 Wagons</span>
-    </div>
-    <div class="telemetry-item">
       <span>Port Minéralier :</span>
       <span class="telemetry-value">Nouadhibou</span>
     </div>
     <div class="telemetry-item">
-      <span>ETA Estimé Arrivée :</span>
-      <span class="telemetry-value" id="tETA">04h 15m</span>
+      <span>Balayage Voie (704 km) :</span>
+      <span class="telemetry-value" id="satScan">OK - 100% Visibilité</span>
     </div>
   </div>
 
   <div id="map"></div>
 
   <script>
-    // 1. FOND DE CARTE SATELLITE ARCGIS HD
+    // 1. CARTE SATELLITE ARCGIS HD
     const map = L.map('map', { zoomControl: false }).setView([21.3000, -14.5000], 7);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -232,7 +232,7 @@
       subdomains: 'abcd'
     }).addTo(map);
 
-    // 2. TRACÉ DES VOIES FERRÉES SNIM (704 KM ZOUÉRATE - NOUADHIBOU)
+    // 2. VOIE FERRÉE SNIM (704 KM ZOUÉRATE - NOUADHIBOU)
     const snimTrackPoints = [
       [22.7441, -12.4789], // Zouérate (Mines)
       [22.6800, -12.7000], // F'Dérik
@@ -251,11 +251,11 @@
       opacity: 0.9
     }).addTo(map);
 
-    // 3. PARAMÈTRES AUDIO & COMMANDES
+    // 3. PARAMÈTRES AUDIO & INTERFACE
     let soundEnabled = true;
     let nightMode = false;
     let autoTrack = false;
-    let useRealGPS = false; // Basculer sur true lors de la connexion au vrai serveur GPS SNIM
+    let useRealGPS = false; // Mettre à true pour basculer sur le serveur GPS direct
     let audioContext = null;
 
     function playAlertSound() {
@@ -300,7 +300,7 @@
       document.getElementById('btnTrack').classList.toggle('btn-active', autoTrack);
     }
 
-    // 4. FLOTTE DES LOCOMOTIVES
+    // 4. LOCOMOTIVES SNIM
     const trains = [
       {
         id: "SNIM-M1",
@@ -320,7 +320,7 @@
         name: "Train Convoyeur Vides 2",
         loco: "EMD SD70ACS (Double Motrice)",
         wagons: 210,
-        cargo: "Wagons Vides + Ravitaillement",
+        cargo: "Wagons Vides + Approvisionnement",
         tonnage: "3 200 T",
         routeIndex: snimTrackPoints.length - 1,
         direction: -1,
@@ -340,90 +340,109 @@
       t.marker = L.marker(t.position, { icon: icon }).addTo(map);
     });
 
-    // 5. MOTEUR DE SUIVI EN TEMPS RÉEL
-    function updatePositions() {
+    // 5. ANALYSE CARTOGRAPHIQUE SATELLITE EN DIRECT (DÉTECTION AUTOMATIQUE D'OBSTACLES)
+    let obstacleSatelliteMarker = null;
+
+    async function analyzeSatelliteImagery() {
       if (useRealGPS) {
-        fetchRealSNIMGPS();
-      } else {
-        updateSimulatedFleet();
-      }
-    }
-
-    function updateSimulatedFleet() {
-      let hasAlert = false;
-
-      trains.forEach(t => {
-        t.routeIndex += t.direction * 0.12;
-
-        if (t.routeIndex >= snimTrackPoints.length - 1) { t.direction = -1; t.routeIndex = snimTrackPoints.length - 1; }
-        else if (t.routeIndex <= 0) { t.direction = 1; t.routeIndex = 0; }
-
-        const idx = Math.floor(t.routeIndex);
-        const nextIdx = Math.min(idx + 1, snimTrackPoints.length - 1);
-        const ratio = t.routeIndex - idx;
-
-        const p1 = snimTrackPoints[idx];
-        const p2 = snimTrackPoints[nextIdx];
-
-        t.position = [p1[0] + (p2[0] - p1[0]) * ratio, p1[1] + (p2[1] - p1[1]) * ratio];
-        t.marker.setLatLng(t.position);
-
-        const isObstacle = Math.random() < 0.2;
-        if (isObstacle) hasAlert = true;
-
-        t.marker.bindPopup(`
-          <div style="font-size:12px; font-family:sans-serif; min-width:180px;">
-            <b style="color:#d97706; font-size:13px;">🚂 ${t.name}</b><br/>
-            <hr style="margin:4px 0; border:0; border-top:1px solid #ccc;"/>
-            <b>ID Loco :</b> ${t.id}<br/>
-            <b>Motrice :</b> ${t.loco}<br/>
-            <b>Wagons :</b> ${t.wagons} wagons<br/>
-            <b>Cargaison :</b> ${t.cargo}<br/>
-            <b>Poids Total :</b> ${t.tonnage}<br/>
-            <b>Vitesse Live :</b> ${t.speed} km/h<br/>
-            <hr style="margin:4px 0; border:0; border-top:1px solid #ccc;"/>
-            <b>État Voie :</b> ${isObstacle ? '<span style="color:red; font-weight:bold;">⚠️ ENSABLEMENT DÉTECTÉ</span>' : '<span style="color:green; font-weight:bold;">✅ Voie Libre</span>'}
-          </div>
-        `);
-      });
-
-      const topPanel = document.getElementById('topPanel');
-      if (hasAlert) {
-        topPanel.classList.add('alert-active');
-        document.getElementById('panelTitle').innerText = "🚨 ALERTE OBSTACLE VOIE !";
-        playAlertSound();
-      } else {
-        topPanel.classList.remove('alert-active');
-        document.getElementById('panelTitle').innerText = "PCD SNIM - SATELLITE LIVE";
-      }
-
-      if (autoTrack) {
-        map.panTo(trains[0].position, { animate: true });
-      }
-    }
-
-    // 6. STRUCTURE RÉCEPTION VRAI GPS LOCOMOTIVE
-    async function fetchRealSNIMGPS() {
-      try {
-        // Remplacez l'URL ci-dessous par votre serveur GPS d'entreprise / Traccar
-        const response = await fetch('https://votre-serveur-snim.com/api/positions');
-        const liveData = await response.json();
-
-        liveData.forEach(data => {
-          const train = trains.find(t => t.id === data.device_id);
-          if (train) {
-            train.position = [data.latitude, data.longitude];
-            train.speed = data.speed;
-            train.marker.setLatLng(train.position);
-
-            if (autoTrack && train.id === "SNIM-M1") {
-              map.panTo(train.position, { animate: true });
-            }
+        // En mode réel : appel de l'API de traitement d'images satellite (Sentinel-2 / InSAR)
+        try {
+          const response = await fetch('https://api-satellite-snim.com/v1/analyse-rails');
+          const data = await response.json();
+          if (data.obstacleDetected) {
+            triggerSatelliteAlert(data.latitude, data.longitude, data.type);
           }
-        });
-      } catch (error) {
-        console.log("Attente de connexion au serveur GPS SNIM...", error);
+        } catch(e) {
+          console.log("Flux satellite en cours d'initialisation...");
+        }
+      } else {
+        // En mode démo : Simulation de détection par analyse spectrophotométrique satellite
+        const isDuneDetected = Math.random() < 0.25; // 25% de chance de détection automatique d'ensablement
+        if (isDuneDetected) {
+          // Point kilométrique aléatoire le long des rails
+          const randomIdx = Math.floor(Math.random() * (snimTrackPoints.length - 1));
+          const lat = snimTrackPoints[randomIdx][0] + (Math.random() - 0.5) * 0.05;
+          const lng = snimTrackPoints[randomIdx][1] + (Math.random() - 0.5) * 0.05;
+          triggerSatelliteAlert(lat, lng, "Ensablement Majeur (Dune Mobile)");
+        } else {
+          clearSatelliteAlert();
+        }
       }
+    }
+
+    function triggerSatelliteAlert(lat, lng, cause) {
+      const topPanel = document.getElementById('topPanel');
+      topPanel.classList.add('alert-active');
+      document.getElementById('panelTitle').innerText = `🚨 IA SATELLITE : ${cause.toUpperCase()}`;
+      document.getElementById('satScan').innerHTML = `<span style="color:#ef4444; font-weight:bold;">⚠️ ENSABLEMENT REPÉRÉ</span>`;
+      
+      playAlertSound();
+
+      // Marqueur rouge d'obstacle sur la carte
+      if (!obstacleSatelliteMarker) {
+        obstacleSatelliteMarker = L.circleMarker([lat, lng], {
+          radius: 12,
+          color: '#ef4444',
+          fillColor: '#dc2626',
+          fillOpacity: 0.8
+        }).addTo(map);
+      } else {
+        obstacleSatelliteMarker.setLatLng([lat, lng]);
+      }
+      obstacleSatelliteMarker.bindPopup(`<b style="color:red;">🛰️ ALERTE SATELLITE IA</b><br/>${cause}`).openPopup();
+    }
+
+    function clearSatelliteAlert() {
+      const topPanel = document.getElementById('topPanel');
+      topPanel.classList.remove('alert-active');
+      document.getElementById('panelTitle').innerText = "PCD SNIM - RADAR SATELLITE";
+      document.getElementById('satScan').innerHTML = `<span style="color:#10b981;">OK - 100% Visibilité</span>`;
+      
+      if (obstacleSatelliteMarker) {
+        map.removeLayer(obstacleSatelliteMarker);
+        obstacleSatelliteMarker = null;
+      }
+    }
+
+    // 6. BOUCLE DE DÉPLACEMENT RÉEL / SIMULÉ
+    function updatePositions() {
+      if (!useRealGPS) {
+        trains.forEach(t => {
+          t.routeIndex += t.direction * 0.12;
+
+          if (t.routeIndex >= snimTrackPoints.length - 1) { t.direction = -1; t.routeIndex = snimTrackPoints.length - 1; }
+          else if (t.routeIndex <= 0) { t.direction = 1; t.routeIndex = 0; }
+
+          const idx = Math.floor(t.routeIndex);
+          const nextIdx = Math.min(idx + 1, snimTrackPoints.length - 1);
+          const ratio = t.routeIndex - idx;
+
+          const p1 = snimTrackPoints[idx];
+          const p2 = snimTrackPoints[nextIdx];
+
+          t.position = [p1[0] + (p2[0] - p1[0]) * ratio, p1[1] + (p2[1] - p1[1]) * ratio];
+          t.marker.setLatLng(t.position);
+
+          t.marker.bindPopup(`
+            <div style="font-size:12px; font-family:sans-serif;">
+              <b style="color:#d97706; font-size:13px;">🚂 ${t.name}</b><br/>
+              <hr style="margin:4px 0; border:0; border-top:1px solid #ccc;"/>
+              <b>ID Loco :</b> ${t.id}<br/>
+              <b>Motrice :</b> ${t.loco}<br/>
+              <b>Wagons :</b> ${t.wagons} wagons<br/>
+              <b>Poids :</b> ${t.tonnage}<br/>
+              <b>Vitesse :</b> ${t.speed} km/h
+            </div>
+          `);
+        });
+
+        if (autoTrack) {
+          map.panTo(trains[0].position, { animate: true });
+        }
+      }
+
+      // Lancer l'analyse automatique satellite à chaque cycle
+      analyzeSatelliteImagery();
     }
 
     function locateUser() {
@@ -436,7 +455,7 @@
       }
     }
 
-    // Boucle d'actualisation temps réel (4 secondes)
+    // Rafraîchissement automatique toutes les 4 secondes
     setInterval(updatePositions, 4000);
   </script>
 </body>
