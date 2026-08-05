@@ -21,17 +21,22 @@
 
   <!-- BRIQUE 1 & 2 : TensorFlow Lite (Edge AI) & Three.js (Digital Twin 3D) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
     html, body, #map { width: 100%; height: 100%; background: #090d16; overflow: hidden; }
     .leaflet-control-attribution { display: none !important; }
 
-    /* BRIQUE 6 : MODES ERGONOMIES DÉSERT ET NUIT INFRAROUGE */
+    /* ERGONOMIE DÉSERT ET NUIT INFRAROUGE */
     .night-mode { filter: invert(90%) hue-rotate(180deg) brightness(90%) contrast(130%); }
-    .sun-mode { filter: contrast(200%) brightness(130%) saturate(150%); background: #ffffff !important; }
+    body.sun-mode { background: #ffffff !important; }
     body.sun-mode * { color: #000000 !important; font-weight: 900 !important; border-color: #000000 !important; }
+    body.sun-mode .top-panel, body.sun-mode .side-panel, body.sun-mode .deadman-container, body.sun-mode .modal-card {
+      background: #ffffff !important;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    body.sun-mode .telemetry-value { color: #000000 !important; text-decoration: underline; }
 
     /* BANDEAU SUPÉRIEUR */
     .top-panel {
@@ -76,7 +81,7 @@
     .telemetry-value { font-weight: bold; color: #38bdf8; }
     .pk-badge { background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #f59e0b; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 4px; }
 
-    /* BRIQUE 5 : BARRE DE VEILLE AUTOMATIQUE (DEADMAN SWITCH) */
+    /* BARRE DE VEILLE AUTOMATIQUE (DEADMAN SWITCH) */
     .deadman-container { position: fixed; right: 15px; bottom: 25px; z-index: 1000; width: 140px; background: rgba(15, 23, 42, 0.9); border: 1px solid #ef4444; border-radius: 10px; padding: 8px; text-align: center; color: white; }
     .deadman-btn { width: 100%; background: #dc2626; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 10px; cursor: pointer; margin-top: 4px; }
     .deadman-progress { height: 6px; background: #334155; border-radius: 3px; overflow: hidden; margin-top: 4px; }
@@ -86,7 +91,6 @@
     #digitalTwinContainer { display: none; width: 100%; height: 180px; background: #000; border-radius: 8px; margin-top: 6px; overflow: hidden; position: relative; }
     #cameraVisionContainer { display: none; width: 100%; height: 160px; background: #000; border-radius: 8px; margin-top: 6px; position: relative; overflow: hidden; }
     #cameraVisionContainer video, #cameraVisionContainer canvas { position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; }
-    .ai-overlay-box { position: absolute; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 9px; font-weight: bold; padding: 2px; pointer-events: none; }
 
     /* MODALES */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 2000; align-items: center; justify-content: center; padding: 15px; }
@@ -147,7 +151,7 @@
       
       <div class="telemetry-section">
         <div class="telemetry-title">🚂 BUS CAN (J1939) & HARDWARE HIL</div>
-        <div class="telemetry-item"><span>Port Physique (WebUSB) :</span><span class="telemetry-value" id="tHILStatus" style="color:#ef4444;">Déconnecté</span></div>
+        <div class="telemetry-item"><span>Port Physique (WebUSB) :</span><span class="telemetry-value" id="tHILStatus" style="color:#ef4444;">Déconnecté (Mode Simulation)</span></div>
         <div class="telemetry-item"><span>Vitesse Bus CAN :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
         <div class="telemetry-item"><span>Consommation Réelle :</span><span class="telemetry-value" id="tRealFuel" style="color:#10b981;">14.2 L/km</span></div>
         <div class="telemetry-item"><span>Régime Moteur (EMD) :</span><span class="telemetry-value" id="tEngineRpm">1850 RPM</span></div>
@@ -156,7 +160,7 @@
       <div class="telemetry-section">
         <div class="telemetry-title">🌡️ MÉTÉO & DILATATION THERMIQUE RAILS</div>
         <div class="telemetry-item"><span>Température Rail :</span><span class="telemetry-value" id="tRailTemp">48°C</span></div>
-        <div class="telemetry-item"><span>Dilatation Acier ($\Delta L$) :</span><span class="telemetry-value" id="tRailExpansion" style="color:#10b981;">+1.4 mm/m</span></div>
+        <div class="telemetry-item"><span>Dilatation Acier (ΔL) :</span><span class="telemetry-value" id="tRailExpansion" style="color:#10b981;">+1.4 mm/m</span></div>
         <div class="telemetry-item"><span>Risque Flambement :</span><span class="telemetry-value" id="tBucklingRisk" style="color:#10b981;">FAIBLE</span></div>
       </div>
 
@@ -214,7 +218,7 @@
 
   <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
-  <!-- BRIQUE 5 : VEILLE AUTOMATIQUE (DEADMAN SWITCH) UI -->
+  <!-- VEILLE AUTOMATIQUE (DEADMAN SWITCH) UI -->
   <div class="deadman-container">
     <div style="font-size:9px; font-weight:bold;">VEILLE AUTOMATIQUE</div>
     <div class="deadman-progress"><div class="deadman-fill" id="deadmanProgress"></div></div>
@@ -301,7 +305,7 @@
 
   <script>
     // =================================================================
-    // BRIQUE 4 : BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER IMMUTABLE)
+    // EDGE LEDGER (BOÎTE NOIRE INFALSIFIABLE)
     // =================================================================
     class EdgeLedger {
       constructor() {
@@ -313,7 +317,6 @@
         const timestamp = new Date().toISOString();
         const blockData = JSON.stringify({ eventType, payload, prevHash, timestamp });
         
-        // Cryptographic Hash SHA-256
         const msgBuffer = new TextEncoder().encode(blockData);
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -336,18 +339,15 @@
     const edgeLedger = new EdgeLedger();
 
     // =================================================================
-    // BRIQUE 4 : RESILIENCE P2P WEBRTC MESH NETWORK INTER-TRAINS
+    // RESILIENCE P2P MESH NETWORK INTER-TRAINS
     // =================================================================
     class TrainP2PMesh {
       constructor() {
-        this.peerConnection = null;
-        this.dataChannel = null;
         this.initMeshChannel();
       }
 
       initMeshChannel() {
         try {
-          // Simulation d'un canal P2P WebRTC local via Wi-Fi HaLow / Radio Cabine
           document.getElementById('meshBadge').innerText = "📡 P2P MESH: ACTIF";
           edgeLedger.appendBlock("P2P_MESH_INIT", { status: "Network Mesh Ready" });
         } catch(e) { console.warn("P2P Mesh non disponible"); }
@@ -361,27 +361,32 @@
     const p2pMesh = new TrainP2PMesh();
 
     // =================================================================
-    // BRIQUE 5 : PASSERELLE HARDWARE-IN-THE-LOOP (WEBUSB / SERIAL J1939)
+    // PASSERELLE HARDWARE-IN-THE-LOOP (WEBUSB / SERIAL J1939 WITH FALLBACK)
     // =================================================================
     async function connectWebUSBHardware() {
-      try {
-        if ('serial' in navigator) {
+      if ('serial' in navigator) {
+        try {
           const port = await navigator.serial.requestPort();
           await port.open({ baudRate: 115200 });
           document.getElementById('tHILStatus').innerText = "Connecté (USB CAN)";
           document.getElementById('tHILStatus').style.color = "#10b981";
-          showToast("🔌 Passerelle Hardware J1939 connectée en direct !");
+          showToast("🔌 Passerelle Hardware J1939 connectée !");
           edgeLedger.appendBlock("HARDWARE_HIL_CONNECT", { port: "WebSerial USB J1939" });
-        } else {
-          showToast("⚠️ Interface WebSerial/WebUSB non supportée par ce navigateur.");
+          return;
+        } catch(e) {
+          console.warn("Échec ou annulation WebSerial, bascule sur la simulation.");
         }
-      } catch(e) {
-        showToast("ℹ️ Connexion matérielle annulée ou non détectée.");
       }
+      
+      // Mode simulation Fallback
+      document.getElementById('tHILStatus').innerText = "Simulé (Télémétrie Active)";
+      document.getElementById('tHILStatus').style.color = "#38bdf8";
+      showToast("ℹ️ Mode Simulation Télémétrie IoT activé.");
+      edgeLedger.appendBlock("HARDWARE_HIL_SIMULATED", { status: "Fallback OK" });
     }
 
     // =================================================================
-    // BRIQUE 5 : SYSTÈME DE VEILLE AUTOMATIQUE (DEADMAN'S SWITCH)
+    // SYSTÈME DE VEILLE AUTOMATIQUE (DEADMAN'S SWITCH / VACMA)
     // =================================================================
     let deadmanTimer = 100;
     let deadmanInterval = null;
@@ -422,13 +427,12 @@
     }
 
     // =================================================================
-    // BRIQUE 1 : EDGE AI (TINYML PREDICTION & COMPUTER VISION TENSORFLOW)
+    // EDGE AI (TINYML PREDICTION & COMPUTER VISION)
     // =================================================================
     let aiModelLoaded = false;
 
     async function initTinyMLEngine() {
       try {
-        // Simulation / Chargement modèle léger TinyML
         aiModelLoaded = true;
         setInterval(runTinyMLInference, 5000);
       } catch(e) {}
@@ -468,7 +472,11 @@
           switchTab('ai');
           startComputerVisionDetection();
         } catch(e) {
-          showToast("⚠️ Accès caméra refusé ou indisponible.");
+          showToast("⚠️ Accès caméra indisponible. Mode simulation actif.");
+          container.style.display = 'block';
+          isCamRunning = true;
+          switchTab('ai');
+          startComputerVisionDetection();
         }
       } else {
         if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
@@ -479,7 +487,6 @@
 
     function startComputerVisionDetection() {
       if (!isCamRunning) return;
-      // Analyse simulée par vision par ordinateur sur les frames de la vidéo
       const resultLabel = document.getElementById('aiDetectResult');
       const simulatedDetections = [
         "Voie dégagée (100%)",
@@ -502,7 +509,7 @@
     }
 
     // =================================================================
-    // BRIQUE 2 : DIGITAL TWIN 3D & TOPOGRAPHIE / Dilatation Thermique
+    // DIGITAL TWIN 3D & DILATATION THERMIQUE
     // =================================================================
     let twinScene, twinCamera, twinRenderer, twinRailMesh;
     let is3DInitialized = false;
@@ -526,7 +533,6 @@
       twinRenderer.setSize(container.clientWidth, container.clientHeight);
       container.appendChild(twinRenderer.domElement);
 
-      // Création synthétique du rail 3D
       const geometry = new THREE.BoxGeometry(1, 0.2, 20);
       const material = new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true });
       twinRailMesh = new THREE.Mesh(geometry, material);
@@ -536,20 +542,21 @@
       twinCamera.lookAt(0, 0, 0);
 
       function animate3D() {
-        requestAnimationFrame(animate3D);
-        twinRailMesh.rotation.y += 0.005;
-        twinRenderer.render(twinScene, twinCamera);
+        if (container.style.display === 'block') {
+          requestAnimationFrame(animate3D);
+          twinRailMesh.rotation.y += 0.005;
+          twinRenderer.render(twinScene, twinCamera);
+        }
       }
       animate3D();
       is3DInitialized = true;
     }
 
-    // Calcul physique de la dilatation thermique de l'acier des rails
     function calculateRailThermalExpansion(tempCelsius) {
-      const alphaSteel = 12e-6; // Coefficient de dilatation linéaire ($\text{K}^{-1}$)
-      const baseTemp = 20; // Température de pose neutre
+      const alphaSteel = 12e-6; 
+      const baseTemp = 20; 
       const deltaT = Math.max(0, tempCelsius - baseTemp);
-      const expansionPerMeter = (alphaSteel * deltaT * 1000).toFixed(2); // mm/m
+      const expansionPerMeter = (alphaSteel * deltaT * 1000).toFixed(2);
 
       document.getElementById('tRailExpansion').innerText = `+${expansionPerMeter} mm/m`;
       
@@ -567,7 +574,7 @@
     }
 
     // =================================================================
-    // BRIQUE 3 : DISPATCHING AUTOMATISÉ ET RECHERCHE OPÉRATIONNELLE
+    // DISPATCHING AUTOMATISÉ ET RECHERCHE OPÉRATIONNELLE
     // =================================================================
     function triggerDispatchOptimization() {
       switchTab('dispatch');
@@ -587,7 +594,7 @@
     }
 
     // =================================================================
-    // BRIQUE 6 : COMMANDES VOCALES NLP & ERGONOMIE SOLEIL DÉSERT
+    // COMMANDES VOCALES NLP & ERGONOMIE SOLEIL DÉSERT
     // =================================================================
     let voiceRecognition = null;
     let isVoiceActive = false;
@@ -607,8 +614,6 @@
 
         voiceRecognition.onresult = (event) => {
           const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-          console.log("🎙️ Vocale reçue :", transcript);
-
           if (transcript.includes("anomalie") || transcript.includes("alerte")) {
             openReportModal();
             showToast("🎙️ Commande : Ouverture modal anomalie");
@@ -623,7 +628,7 @@
         isVoiceActive = true;
         btn.innerText = "🎙️ VOCAL: ON";
         btn.classList.add('btn-active');
-        showToast("🎙️ Reconnaissance vocale activée (Parlez en langage naturel)");
+        showToast("🎙️ Reconnaissance vocale activée");
       } else {
         if (voiceRecognition) voiceRecognition.stop();
         isVoiceActive = false;
@@ -636,7 +641,7 @@
       document.body.classList.toggle('sun-mode');
       const isSun = document.body.classList.contains('sun-mode');
       document.getElementById('btnSun').classList.toggle('btn-active', isSun);
-      showToast(isSun ? "☀️ Mode haute lisibilité plein soleil désert activé" : "🌙 Mode standard réactivé");
+      showToast(isSun ? "☀️ Mode haute lisibilité désert activé" : "🌙 Mode standard réactivé");
     }
 
     // =================================================================
@@ -705,7 +710,7 @@
     });
 
     // =================================================================
-    // GESTION UTILISATEUR & INTERACTION UI
+    // GESTION UTILISATEUR & UI
     // =================================================================
     let currentUser = JSON.parse(sessionStorage.getItem('snim_token_session') || 'null');
 
@@ -782,7 +787,7 @@
       const type = document.getElementById('repType').value;
       const severity = document.getElementById('repSeverity').value;
       const details = document.getElementById('repDetails').value;
-      const report = { pk, type, severity, details, driver: currentUser.matricule, time: new Date().toLocaleTimeString() };
+      const report = { pk, type, severity, details, driver: currentUser ? currentUser.matricule : "Inconnu", time: new Date().toLocaleTimeString() };
 
       await localDB.saveReport(report);
       p2pMesh.broadcastP2P({ action: "NEW_REPORT", report });
