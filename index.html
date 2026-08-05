@@ -5,18 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PCD 2.0 SNIM - Industrial Command Center</title>
   
-  <!-- Configurations PWA Mobile Native -->
-  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;,&quot;orientation&quot;:&quot;portrait&quot;&#125;">
+  <!-- Configurations PWA Mobile & Standalone Native -->
+  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;,&quot;orientation&quot;:&quot;any&quot;&#125;">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- Client Backend Supabase -->
+  <!-- Client Backend Supabase & MQTT WebSocket -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
     * {
@@ -404,6 +406,7 @@
       
       <div class="telemetry-section">
         <div class="telemetry-title">🚂 BUS CAN (J1939) & CAPTEURS IoT</div>
+        <div class="telemetry-item"><span>Flux IoT / MQTT :</span><span class="telemetry-value" id="tIotSource" style="color:#a855f7;">SIMULÉ (Fallback)</span></div>
         <div class="telemetry-item"><span>Vitesse Bus CAN :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
         <div class="telemetry-item"><span>Consommation Réelle :</span><span class="telemetry-value" id="tRealFuel" style="color:#10b981;">14.2 L/km</span></div>
         <div class="telemetry-item"><span>Régime Moteur :</span><span class="telemetry-value" id="tEngineRpm">1850 RPM</span></div>
@@ -425,6 +428,7 @@
       <div class="telemetry-section">
         <div class="telemetry-title">📡 SÉCURITÉ DSI & LIAISONS IOT</div>
         <div class="telemetry-item"><span>Canal Actif :</span><span class="telemetry-value" id="netStatus" style="color:#10b981;">4G LTE</span></div>
+        <div class="telemetry-item"><span>Session JWT/OIDC :</span><span class="telemetry-value" id="jwtStatus" style="color:#10b981;">Valide (Auto-Refresh)</span></div>
         <div class="telemetry-item"><span>Chiffrement DB :</span><span class="telemetry-value" id="cryptoStatus" style="color:#f59e0b;">AES-256 (Inactif)</span></div>
         <div class="telemetry-item"><span>En Attente Sync Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
       </div>
@@ -555,15 +559,16 @@
     </div>
   </div>
 
-  <!-- MODAL 3: ORDRE DE REGULATION INTERACTIF (NOUADHIBOU DISPATCH) -->
+  <!-- MODAL 3: ORDRE DE REGULATION INTERACTIF (NOUADHIBOU / ZOUÉRATE DISPATCH) -->
   <div class="modal-overlay" id="dispatchModal">
     <div class="modal-card" style="border-color:#a855f7; max-width:450px;">
-      <div class="modal-title" style="color:#c084fc;">📡 ORDRE DU POSTE CENTRAL (NOUADHIBOU)</div>
+      <div class="modal-title" style="color:#c084fc;">📡 ORDRE DU POSTE CENTRAL DE RÉGULATION</div>
       <div style="font-size:12px; margin-bottom:12px; color:#e2e8f0;">
-        <p><strong>Régulateur :</strong> Central PCD Nouadhibou</p>
-        <p><strong>Ordre :</strong> <span id="dispInstruction" style="color:#f59e0b; font-weight:bold;"></span></p>
-        <p><strong>Secteur :</strong> <span id="dispSector"></span></p>
+        <p><strong>Régulateur Source :</strong> <span id="dispOrigin" style="color:#38bdf8;">Central PCD</span></p>
+        <p><strong>Ordre Prioritaire :</strong> <span id="dispInstruction" style="color:#f59e0b; font-weight:bold;"></span></p>
+        <p><strong>Secteur Concerné :</strong> <span id="dispSector"></span></p>
         <p><strong>Vitesse Maximale :</strong> <span id="dispSpeed" style="color:#ef4444; font-weight:bold;"></span></p>
+        <p><small style="color:#94a3b8;">Horodateur CRDT : <span id="dispTimestamp"></span></small></p>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-submit" style="background:#a855f7;" onclick="acknowledgeDispatchOrder()">ACK / ACQUITTER L'ORDRE</button>
@@ -723,19 +728,21 @@
     }
 
     const localDB = new LocalDB();
-    localDB.init().catch(() => console.warn("IndexDB non supporté"));
+    localDB.init().catch(() => console.warn("IndexedDB non supporté"));
 
     // -----------------------------------------------------------------
-    // 2. ARBITRAGE RESEAU HYBRIDE & SECOURS (4G / SATELLITE / LoRaWAN)
+    // 2. ARBITRAGE RESEAU HYBRIDE, FAILOVER AUTOMATIQUE & REFRESH JWT
     // -----------------------------------------------------------------
-    class HybridNetworkManager {
+    class FailoverJWTManager {
       constructor() {
         this.isOnline4G = navigator.onLine;
-        window.addEventListener('online', () => this.updateStatus(true));
-        window.addEventListener('offline', () => this.updateStatus(false));
+        this.refreshTimer = null;
+        window.addEventListener('online', () => this.handleNetworkChange(true));
+        window.addEventListener('offline', () => this.handleNetworkChange(false));
+        this.startSilentRefreshLoop();
       }
 
-      updateStatus(online) {
+      handleNetworkChange(online) {
         this.isOnline4G = online;
         const netLabel = document.getElementById('netStatus');
         const netBadge = document.getElementById('hybridNetBadge');
@@ -746,13 +753,37 @@
           netBadge.innerText = "🌐 4G LTE";
           netBadge.style.borderColor = "#10b981";
           netBadge.style.color = "#10b981";
+          showToast("📶 Connexion 4G LTE rétablie. Reprise de la synchro Cloud...");
           syncOfflineReports();
+          this.refreshJWTToken();
         } else {
           netLabel.innerText = "Satellite / LoRaWAN (Secours)";
           netLabel.style.color = "#f59e0b";
           netBadge.innerText = "📡 SECOURS SAT/LoRa";
           netBadge.style.borderColor = "#f59e0b";
           netBadge.style.color = "#f59e0b";
+          showToast("🛰️ Basculement Réseau : Passage en mode Satellite / LoRaWAN");
+        }
+      }
+
+      startSilentRefreshLoop() {
+        // Rafraîchissement automatique des jetons toutes les 15 minutes sans déconnexion utilisateur
+        this.refreshTimer = setInterval(() => {
+          if (currentUser && this.isOnline4G) {
+            this.refreshJWTToken();
+          }
+        }, 15 * 60 * 1000);
+      }
+
+      async refreshJWTToken() {
+        if (!currentUser) return;
+        try {
+          currentUser.token = generateMockJWT(currentUser.matricule, currentUser.role);
+          sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
+          document.getElementById('jwtStatus').innerText = "Valide (Auto-Refreshed)";
+          console.log("🔒 Jeton JWT rafraîchi silencieusement en arrière-plan.");
+        } catch(e) {
+          document.getElementById('jwtStatus').innerText = "Mode Hors-Ligne (Dernier Jeton)";
         }
       }
 
@@ -762,7 +793,7 @@
           const { error } = await supabaseClient.from('reports').insert([report]);
           return !error;
         } else {
-          console.warn("📡 Réseau Cellular indisponible. Envoi micro-trame binaire via Passerelle Satellite Cabine...");
+          console.warn("📡 Réseau Cellular indisponible. Envoi micro-trame binaire via Passerelle Satellite/LoRaWAN Cabine...");
           const compactPayload = {
             pk: report.pk,
             sev: report.severity === "CRITIQUE" ? 0x01 : 0x02,
@@ -774,10 +805,119 @@
       }
     }
 
-    const networkManager = new HybridNetworkManager();
+    const networkManager = new FailoverJWTManager();
 
     // -----------------------------------------------------------------
-    // 3. BACKEND SUPABASE & POSTGIS SYNC
+    // 3. INGESTION RÉELLE IoT (MQTT OVER WEBSOCKET) + FALLBACK SIMULATION
+    // -----------------------------------------------------------------
+    class MQTTBrokerBridge {
+      constructor() {
+        this.client = null;
+        this.isConnected = false;
+        // URL exemple d'un broker industriel LoRaWAN / Bus CAN
+        this.brokerUrl = "wss://broker.hivemq.com:8000/mqtt";
+        this.initMQTT();
+      }
+
+      initMQTT() {
+        if (typeof mqtt === "undefined") {
+          console.warn("Librairie MQTT non chargée, basculement en mode simulation.");
+          return;
+        }
+        
+        try {
+          this.client = mqtt.connect(this.brokerUrl, {
+            clientId: 'SNIM_PCD_CLIENT_' + Math.random().toString(16).substr(2, 8),
+            keepalive: 30,
+            reconnectPeriod: 5000
+          });
+
+          this.client.on('connect', () => {
+            this.isConnected = true;
+            document.getElementById('tIotSource').innerText = "MQTT ACTIF (LoRaWAN/CAN)";
+            document.getElementById('tIotSource').style.color = "#10b981";
+            this.client.subscribe("snim/loco/+/telemetry");
+            this.client.subscribe("snim/pcd/orders");
+          });
+
+          this.client.on('message', (topic, message) => {
+            try {
+              const payload = JSON.parse(message.toString());
+              if (topic.includes("telemetry")) {
+                this.handleTelemetryIngestion(payload);
+              } else if (topic.includes("orders")) {
+                conflictResolver.processIncomingOrder(payload);
+              }
+            } catch(e) {}
+          });
+
+          this.client.on('offline', () => {
+            this.isConnected = false;
+            document.getElementById('tIotSource').innerText = "SIMULÉ (Fallback Network)";
+            document.getElementById('tIotSource').style.color = "#a855f7";
+          });
+        } catch(e) {
+          console.warn("Impossible de se connecter au Broker MQTT physique, mode simulé activé.");
+        }
+      }
+
+      handleTelemetryIngestion(data) {
+        if (data.speed !== undefined) document.getElementById('tAvgSpeed').innerText = `${data.speed} km/h`;
+        if (data.rpm !== undefined) document.getElementById('tEngineRpm').innerText = `${data.rpm} RPM`;
+        if (data.fuel !== undefined) document.getElementById('tRealFuel').innerText = `${data.fuel} L/km`;
+        if (data.railTemp !== undefined) {
+          document.getElementById('tRailTemp').innerText = `${data.railTemp}°C`;
+          document.getElementById('tDilatation').innerHTML = data.railTemp > 49 
+            ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
+            : `<span style="color:#10b981;">MODÉRÉ</span>`;
+        }
+      }
+    }
+
+    const mqttBridge = new MQTTBrokerBridge();
+
+    // -----------------------------------------------------------------
+    // 4. ARBITRAGE MULTI-AGENTS ET RÉSOLUTION DE CONFLITS (CRDT / QUEUE)
+    // -----------------------------------------------------------------
+    class ConflictResolutionEngine {
+      constructor() {
+        this.orderQueue = [];
+        this.processedVectorClocks = new Map();
+      }
+
+      processIncomingOrder(newOrder) {
+        // Validation horodatage logique (Vector Clock / LWW-Element-Set CRDT)
+        const sectorKey = newOrder.sector;
+        const existingOrder = this.processedVectorClocks.get(sectorKey);
+
+        if (existingOrder) {
+          if (newOrder.timestamp <= existingOrder.timestamp) {
+            console.warn("⚠️ [CRDT Resolution] Ordre obsolète rejeté pour le secteur", sectorKey);
+            return false;
+          }
+        }
+
+        // Enregistrement de l'ordre prioritaire
+        this.processedVectorClocks.set(sectorKey, newOrder);
+        this.orderQueue.push(newOrder);
+
+        // Affichage de l'ordre dans l'interface
+        document.getElementById('dispOrigin').innerText = newOrder.origin || "Central PCD";
+        document.getElementById('dispInstruction').innerText = newOrder.instruction;
+        document.getElementById('dispSector').innerText = newOrder.sector;
+        document.getElementById('dispSpeed').innerText = newOrder.speed;
+        document.getElementById('dispTimestamp').innerText = new Date(newOrder.timestamp).toLocaleTimeString();
+        
+        document.getElementById('dispatchModal').style.display = 'flex';
+        playAlertSound();
+        return true;
+      }
+    }
+
+    const conflictResolver = new ConflictResolutionEngine();
+
+    // -----------------------------------------------------------------
+    // 5. BACKEND SUPABASE & POSTGIS SYNC
     // -----------------------------------------------------------------
     const SUPABASE_URL = "https://xyzcompany.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
@@ -790,16 +930,17 @@
     } catch(e) { console.warn("Mode Cloud déconnecté."); }
 
     // -----------------------------------------------------------------
-    // 4. SERVICE WORKER PWA & MAP TILE CACHING DYNAMIQUE
+    // 6. SERVICE WORKER PWA FULL OFF-LINE & MAP CACHING
     // -----------------------------------------------------------------
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE_NAME = 'snim-pcd-v5';
+        const CACHE_NAME = 'snim-pcd-v6-enterprise';
         const STATIC_ASSETS = [
           './',
           'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
           'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-          'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+          'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+          'https://unpkg.com/mqtt/dist/mqtt.min.js'
         ];
 
         self.addEventListener('install', e => {
@@ -839,7 +980,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 5. PRE-CHARGEMENT DES TUILES DE CARTE (NOUADHIBOU -> ZOUÉRATE)
+    // 7. PRE-CHARGEMENT DES TUILES DE CARTE (NOUADHIBOU -> ZOUÉRATE)
     // -----------------------------------------------------------------
     async function preloadOfflineLine() {
       showToast("⏳ Début du téléchargement du tracé ferroviaire (PK 0 à PK 704)...");
@@ -853,7 +994,7 @@
       });
 
       try {
-        const cache = await caches.open('snim-pcd-v5');
+        const cache = await caches.open('snim-pcd-v6-enterprise');
         await Promise.all(tileUrls.map(u => fetch(u).then(r => cache.put(u, r)).catch(()=>{})));
         showToast("✅ Tuiles du réseau SNIM pré-enregistrées pour le désert !");
       } catch(e) {
@@ -862,7 +1003,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 6. CARTE ET RÉSEAU FERROVIAIRE
+    // 8. CARTE ET RÉSEAU FERROVIAIRE
     // -----------------------------------------------------------------
     const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
 
@@ -891,7 +1032,7 @@
     });
 
     // -----------------------------------------------------------------
-    // 7. GESTION UTILISATEUR & AUTHENTIFICATION SÉCURISÉE (OIDC/JWT)
+    // 9. GESTION UTILISATEUR & AUTHENTIFICATION SÉCURISÉE (OIDC/JWT)
     // -----------------------------------------------------------------
     let currentUser = JSON.parse(sessionStorage.getItem('snim_token_session') || 'null');
     let soundEnabled = true;
@@ -1027,31 +1168,27 @@
     }
 
     // -----------------------------------------------------------------
-    // 8. INTERFACE DE REGULATION EN TEMPS REEL (NOUADHIBOU DISPATCH)
+    // 10. TEST DE REGULATION ET RESOLUTION DE CONFLITS SYNCHRONE
     // -----------------------------------------------------------------
     function simulateDispatchOrder() {
       const orders = [
-        { instruction: "Croisement prioritaire imposé au PK 460", sector: "PK 450 à PK 470", speed: "20 km/h" },
-        { instruction: "Alerte Tempête de sable - Vitesse réduite", sector: "PK 200 à PK 350", speed: "30 km/h" },
-        { instruction: "Arrêt d'urgence - Inspection rail chaud", sector: "PK 650", speed: "0 km/h (HALTE)" }
+        { origin: "PCD Nouadhibou Central", instruction: "Croisement prioritaire imposé au PK 460", sector: "PK 450 à PK 470", speed: "20 km/h", timestamp: Date.now() },
+        { origin: "Poste Zouérate Nord", instruction: "Alerte Tempête de sable - Vitesse réduite", sector: "PK 200 à PK 350", speed: "30 km/h", timestamp: Date.now() },
+        { origin: "PCD Nouadhibou Central", instruction: "Arrêt d'urgence - Inspection rail chaud", sector: "PK 650", speed: "0 km/h (HALTE)", timestamp: Date.now() }
       ];
       const randomOrder = orders[Math.floor(Math.random() * orders.length)];
-
-      document.getElementById('dispInstruction').innerText = randomOrder.instruction;
-      document.getElementById('dispSector').innerText = randomOrder.sector;
-      document.getElementById('dispSpeed').innerText = randomOrder.speed;
       
-      document.getElementById('dispatchModal').style.display = 'flex';
-      playAlertSound();
+      // Passage par le moteur CRDT multi-agent
+      conflictResolver.processIncomingOrder(randomOrder);
     }
 
     function acknowledgeDispatchOrder() {
       document.getElementById('dispatchModal').style.display = 'none';
-      showToast("✅ Ordre de régulation acquitté & transmis au Poste Central de Nouadhibou");
+      showToast("✅ Ordre de régulation acquitté & synchronisé dans la file d'ordres");
     }
 
     // -----------------------------------------------------------------
-    // 9. GÉOLOCALISATION GPS
+    // 11. GÉOLOCALISATION GPS
     // -----------------------------------------------------------------
     function toggleGPSReal() {
       realGPSActive = !realGPSActive;
@@ -1083,7 +1220,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 10. SYNCHRONISATION ET SIGNALEMENT MULTI-CANAL
+    // 12. SYNCHRONISATION ET SIGNALEMENT MULTI-CANAL
     // -----------------------------------------------------------------
     function filterReports(sev) {
       currentFilter = sev;
@@ -1205,7 +1342,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 11. SIMULATION FLOTTE & BUS CAN EN DIRECT
+    // 13. SIMULATION FLOTTE & BUS CAN EN DIRECT (SI MQTT OFF)
     // -----------------------------------------------------------------
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
@@ -1240,20 +1377,22 @@
     });
 
     function updatePositions() {
-      // Metrique Bus CAN J1939 dynamiques
-      const dynamicSpeed = 45 + Math.floor(Math.random() * 8);
-      const dynamicRpm = 1750 + Math.floor(Math.random() * 200);
-      const dynamicFuel = (13.8 + Math.random() * 0.8).toFixed(1);
+      // Mises à jour en mode simulation uniquement si pas de flux MQTT direct
+      if (!mqttBridge.isConnected) {
+        const dynamicSpeed = 45 + Math.floor(Math.random() * 8);
+        const dynamicRpm = 1750 + Math.floor(Math.random() * 200);
+        const dynamicFuel = (13.8 + Math.random() * 0.8).toFixed(1);
 
-      document.getElementById('tAvgSpeed').innerText = `${dynamicSpeed} km/h`;
-      document.getElementById('tEngineRpm').innerText = `${dynamicRpm} RPM`;
-      document.getElementById('tRealFuel').innerText = `${dynamicFuel} L/km`;
+        document.getElementById('tAvgSpeed').innerText = `${dynamicSpeed} km/h`;
+        document.getElementById('tEngineRpm').innerText = `${dynamicRpm} RPM`;
+        document.getElementById('tRealFuel').innerText = `${dynamicFuel} L/km`;
 
-      const currentTemp = 42 + Math.floor(Math.random() * 10);
-      document.getElementById('tRailTemp').innerText = `${currentTemp}°C`;
-      document.getElementById('tDilatation').innerHTML = currentTemp > 49 
-        ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
-        : `<span style="color:#10b981;">MODÉRÉ</span>`;
+        const currentTemp = 42 + Math.floor(Math.random() * 10);
+        document.getElementById('tRailTemp').innerText = `${currentTemp}°C`;
+        document.getElementById('tDilatation').innerHTML = currentTemp > 49 
+          ? `<span style="color:#ef4444;">ÉLEVÉ (Vitesse < 40 km/h)</span>` 
+          : `<span style="color:#10b981;">MODÉRÉ</span>`;
+      }
 
       trains.forEach(t => {
         t.routeIndex += t.direction * 0.12;
@@ -1274,7 +1413,7 @@
         t.marker.bindPopup(`
           <div style="font-size:12px;">
             <b style="color:#d97706;">🚂 ${t.name} (${t.id})</b><br/>
-            <b>Bus CAN Speed :</b> ${dynamicSpeed} km/h<br/>
+            <b>Vitesse Instantanée :</b> ${document.getElementById('tAvgSpeed').innerText}<br/>
             <b style="color:#ef4444;">Zone d'arrêt d'urgence : 1.8 km</b>
           </div>
         `);
