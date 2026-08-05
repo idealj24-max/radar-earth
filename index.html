@@ -6,22 +6,22 @@
 <title>SNIM Rail OS v3.0 - Industrial Command & Decision Platform</title>
 
 <!-- Manifest & PWA Standalone -->
-<link rel="manifest" href='data:application/manifest+json,{"name":"SNIM Rail OS","short_name":"RailOS SNIM","start_url":".","display":"standalone","background_color":"#090d16","theme_color":"#0f172a"}'>
+<link rel="manifest" href="data:application/manifest+json,{"name":"SNIM Rail OS","short_name":"RailOS SNIM","start_url":".","display":"standalone","background_color":"#090d16","theme_color":"#0f172a"}">
 <meta name="theme-color" content="#0f172a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 
 <!-- Leaflet CSS & JS -->
-<link rel="stylesheet" href="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.css](https://unpkg.com/leaflet@1.9.4/dist/leaflet.css)" />
-<script src="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.js](https://unpkg.com/leaflet@1.9.4/dist/leaflet.js)"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- Libraries Cloud/MQTT -->
-<script src="[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)"></script>
-<script src="[https://unpkg.com/mqtt/dist/mqtt.min.js](https://unpkg.com/mqtt/dist/mqtt.min.js)"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
 <!-- BRIQUE 1 & 2 : TensorFlow Lite (Edge AI) & Three.js (Digital Twin 3D) -->
-<script src="[https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js](https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js)"></script>
-<script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.min.js"></script>
 
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
@@ -74,7 +74,7 @@ max-height: 75vh; overflow-y: auto; transition: transform 0.3s ease;
 .telemetry-title { font-size: 10px; text-transform: uppercase; color: #f59e0b; margin-bottom: 3px; font-weight: bold; }
 .telemetry-item { font-size: 10px; display: flex; justify-content: space-between; margin-bottom: 2px; }
 .telemetry-value { font-weight: bold; color: #38bdf8; }
-.pk-badge { background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #f59e0b; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 4px; white-space: nowrap; }
+.pk-badge { background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #f59e0b; font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 4px; }
 
 /* BRIQUE 5 : BARRE DE VEILLE AUTOMATIQUE (DEADMAN SWITCH) */
 .deadman-container { position: fixed; right: 15px; bottom: 25px; z-index: 1000; width: 140px; background: rgba(15, 23, 42, 0.9); border: 1px solid #ef4444; border-radius: 10px; padding: 8px; text-align: center; color: white; }
@@ -86,6 +86,7 @@ max-height: 75vh; overflow-y: auto; transition: transform 0.3s ease;
 #digitalTwinContainer { display: none; width: 100%; height: 180px; background: #000; border-radius: 8px; margin-top: 6px; overflow: hidden; position: relative; }
 #cameraVisionContainer { display: none; width: 100%; height: 160px; background: #000; border-radius: 8px; margin-top: 6px; position: relative; overflow: hidden; }
 #cameraVisionContainer video, #cameraVisionContainer canvas { position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; }
+.ai-overlay-box { position: absolute; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 9px; font-weight: bold; padding: 2px; pointer-events: none; }
 
 /* MODALES */
 .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 2000; align-items: center; justify-content: center; padding: 15px; }
@@ -111,189 +112,189 @@ max-height: 75vh; overflow-y: auto; transition: transform 0.3s ease;
 
 <!-- BANDEAU HAUT -->
 <div class="top-panel" id="topPanel">
-  <div class="brand">
-    <div class="pulse"></div>
-    <span id="panelTitle">SNIM Rail OS 3.0</span>
-    <span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
-    <span class="net-badge" id="hybridNetBadge">🌐 4G LTE</span>
-    <span class="mesh-badge" id="meshBadge">📡 P2P MESH: ON</span>
-  </div>
-  <div class="controls">
-    <button class="btn btn-ai" onclick="toggleCamAI()">👁️ VISION AI</button>
-    <button class="btn btn-3d" onclick="toggleDigitalTwin()">🧊 JUMEAU 3D</button>
-    <button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
-    <button class="btn" onclick="triggerDispatchOptimization()" style="background:#7c3aed;">🧠 OPTIMISER CROISEMENT</button>
-    <button class="btn" id="btnVoice" onclick="toggleVoiceControl()">🎙️ VOCAL: OFF</button>
-    <button class="btn" id="btnSun" onclick="toggleSunMode()">☀️ DÉSERT</button>
-    <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
-    <button class="btn" onclick="connectWebUSBHardware()">🔌 HARDWARE IoT</button>
-    <button class="btn" id="btnAuthToggle" onclick="handleAuthButtonClick()">🔑 AGENT</button>
-  </div>
+<div class="brand">
+<div class="pulse"></div>
+<span id="panelTitle">SNIM Rail OS 3.0</span>
+<span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
+<span class="net-badge" id="hybridNetBadge">🌐 4G LTE</span>
+<span class="mesh-badge" id="meshBadge">📡 P2P MESH: ON</span>
+</div>
+<div class="controls">
+<button class="btn btn-ai" onclick="toggleCamAI()">👁️ VISION AI</button>
+<button class="btn btn-3d" onclick="toggleDigitalTwin()">🧊 JUMEAU 3D</button>
+<button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
+<button class="btn" onclick="triggerDispatchOptimization()" style="background:#7c3aed;">🧠 OPTIMISER CROISEMENT</button>
+<button class="btn" id="btnVoice" onclick="toggleVoiceControl()">🎙️ VOCAL: OFF</button>
+<button class="btn" id="btnSun" onclick="toggleSunMode()">☀️ DÉSERT</button>
+<button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
+<button class="btn" onclick="connectWebUSBHardware()">🔌 HARDWARE IoT</button>
+<button class="btn" id="btnAuthToggle" onclick="handleAuthButtonClick()">🔑 AGENT</button>
+</div>
 </div>
 
 <!-- PANNEAU LATÉRAL -->
 <div class="side-panel" id="sidePanel">
-  <div class="panel-tabs">
-    <button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">📡 TEMPS RÉEL</button>
-    <button class="tab-btn" id="tabAIBtn" onclick="switchTab('ai')">🤖 EDGE AI & TINYML</button>
-    <button class="tab-btn" id="tabDispatchBtn" onclick="switchTab('dispatch')">🔀 DISPATCH</button>
-    <button class="tab-btn" id="tabLedgerBtn" onclick="switchTab('ledger')">🔒 BOÎTE NOIRE</button>
-  </div>
+<div class="panel-tabs">
+<button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">📡 TEMPS RÉEL</button>
+<button class="tab-btn" id="tabAIBtn" onclick="switchTab('ai')">🤖 EDGE AI & TINYML</button>
+<button class="tab-btn" id="tabDispatchBtn" onclick="switchTab('dispatch')">🔀 DISPATCH</button>
+<button class="tab-btn" id="tabLedgerBtn" onclick="switchTab('ledger')">🔒 BOÎTE NOIRE</button>
+</div>
 
-  <!-- VUE 1 : TEMPS RÉEL -->
-  <div id="tabLive">
-    <h4 style="color:#f59e0b; font-size:11px; margin-bottom:6px;" id="panelRoleTitle">POSTE DE COMMANDEMENT BORD</h4>
+<!-- VUE 1 : TEMPS RÉEL -->
+<div id="tabLive">
+<h4 style="color:#f59e0b; font-size:11px; margin-bottom:6px;" id="panelRoleTitle">POSTE DE COMMANDEMENT BORD</h4>
 
-    <div class="telemetry-section">
-      <div class="telemetry-title">🚂 BUS CAN (J1939) & HARDWARE HIL</div>
-      <div class="telemetry-item"><span>Port Physique (WebUSB) :</span><span class="telemetry-value" id="tHILStatus" style="color:#ef4444;">Déconnecté</span></div>
-      <div class="telemetry-item"><span>Vitesse Bus CAN :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
-      <div class="telemetry-item"><span>Consommation Réelle :</span><span class="telemetry-value" id="tRealFuel" style="color:#10b981;">14.2 L/km</span></div>
-      <div class="telemetry-item"><span>Régime Moteur (EMD) :</span><span class="telemetry-value" id="tEngineRpm">1850 RPM</span></div>
-    </div>
+<div class="telemetry-section">
+<div class="telemetry-title">🚂 BUS CAN (J1939) & HARDWARE HIL</div>
+<div class="telemetry-item"><span>Port Physique (WebUSB) :</span><span class="telemetry-value" id="tHILStatus" style="color:#ef4444;">Déconnecté</span></div>
+<div class="telemetry-item"><span>Vitesse Bus CAN :</span><span class="telemetry-value" id="tAvgSpeed">48 km/h</span></div>
+<div class="telemetry-item"><span>Consommation Réelle :</span><span class="telemetry-value" id="tRealFuel" style="color:#10b981;">14.2 L/km</span></div>
+<div class="telemetry-item"><span>Régime Moteur (EMD) :</span><span class="telemetry-value" id="tEngineRpm">1850 RPM</span></div>
+</div>
 
-    <div class="telemetry-section">
-      <div class="telemetry-title">🌡️ MÉTÉO & DILATATION THERMIQUE RAILS</div>
-      <div class="telemetry-item"><span>Température Rail :</span><span class="telemetry-value" id="tRailTemp">48°C</span></div>
-      <div class="telemetry-item"><span>Dilatation Acier :</span><span class="telemetry-value" id="tRailExpansion" style="color:#10b981;">+1.4 mm/m</span></div>
-      <div class="telemetry-item"><span>Risque Flambement :</span><span class="telemetry-value" id="tBucklingRisk" style="color:#10b981;">FAIBLE</span></div>
-    </div>
+<div class="telemetry-section">
+<div class="telemetry-title">🌡️ MÉTÉO & DILATATION THERMIQUE RAILS</div>
+<div class="telemetry-item"><span>Température Rail :</span><span class="telemetry-value" id="tRailTemp">48°C</span></div>
+<div class="telemetry-item"><span>Dilatation Acier ( ) :</span><span class="telemetry-value" id="tRailExpansion" style="color:#10b981;">+1.4 mm/m</span></div>
+<div class="telemetry-item"><span>Risque Flambement :</span><span class="telemetry-value" id="tBucklingRisk" style="color:#10b981;">FAIBLE</span></div>
+</div>
 
-    <div id="digitalTwinContainer"></div>
-  </div>
+<div id="digitalTwinContainer"></div>
+</div>
 
-  <!-- VUE 2 : EDGE AI & COMPUTER VISION -->
-  <div id="tabAI" style="display: none;">
-    <h4 style="color:#38bdf8; font-size:11px; margin-bottom:6px;">INTELLIGENCE ARTIFICIELLE EMBARQUÉE</h4>
+<!-- VUE 2 : EDGE AI & COMPUTER VISION -->
+<div id="tabAI" style="display: none;">
+<h4 style="color:#38bdf8; font-size:11px; margin-bottom:6px;">INTELLIGENCE ARTIFICIELLE EMBARQUÉE</h4>
 
-    <div class="telemetry-section">
-      <div class="telemetry-title">🔮 PRÉDICTION DE PANNE (TINYML ENGINE)</div>
-      <div class="telemetry-item"><span>Vibrations Essieux :</span><span class="telemetry-value" id="aiVib">0.04 g (Normal)</span></div>
-      <div class="telemetry-item"><span>Pression Huile Moteur :</span><span class="telemetry-value" id="aiOil">4.2 bar (Nominal)</span></div>
-      <div class="telemetry-item"><span>Anomalie Moteur prédite :</span><span class="telemetry-value" id="aiPredictEngine" style="color:#10b981;">0.8% (Aucune)</span></div>
-    </div>
+<div class="telemetry-section">
+<div class="telemetry-title">🔮 PREDICTION DE PANNE (TINYML ENGINE)</div>
+<div class="telemetry-item"><span>Vibrations Essieux :</span><span class="telemetry-value" id="aiVib">0.04 g (Normal)</span></div>
+<div class="telemetry-item"><span>Pression Huile Moteur :</span><span class="telemetry-value" id="aiOil">4.2 bar (Nominal)</span></div>
+<div class="telemetry-item"><span>Anomalie Moteur prédite :</span><span class="telemetry-value" id="aiPredictEngine" style="color:#10b981;">0.8% (Aucune)</span></div>
+</div>
 
-    <div class="telemetry-section">
-      <div class="telemetry-title">📷 DÉTECTION OBSTACLE CABINE</div>
-      <button class="btn btn-ai" style="width:100%; justify-content:center;" onclick="toggleCamAI()">DÉMARRER CAMÉRA FLUX</button>
-      <div id="cameraVisionContainer">
-        <video id="webcamVideo" autoplay playsinline muted></video>
-        <canvas id="visionCanvas"></canvas>
-      </div>
-      <div class="telemetry-item" style="margin-top:5px;"><span>Détection dromadaire/sable :</span><span class="telemetry-value" id="aiDetectResult">En attente...</span></div>
-    </div>
-  </div>
+<div class="telemetry-section">
+<div class="telemetry-title">📷 DECTECTION OBSTACLE CABINE</div>
+<button class="btn btn-ai" style="width:100%; justify-content:center;" onclick="toggleCamAI()">DÉMARRER CAMÉRA FLUX</button>
+<div id="cameraVisionContainer">
+<video id="webcamVideo" autoplay playsinline muted></video>
+<canvas id="visionCanvas"></canvas>
+</div>
+<div class="telemetry-item" style="margin-top:5px;"><span>Détection dromadaire/sable :</span><span class="telemetry-value" id="aiDetectResult">En attente...</span></div>
+</div>
+</div>
 
-  <!-- VUE 3 : ALGORITHME DISPATCHING ET REGULATION -->
-  <div id="tabDispatch" style="display: none;">
-    <h4 style="color:#c084fc; font-size:11px; margin-bottom:6px;">RÉGULATION AUTO (VOIE UNIQUE 650KM)</h4>
+<!-- VUE 3 : ALGORITHME DISPATCHING ET REGULATION -->
+<div id="tabDispatch" style="display: none;">
+<h4 style="color:#c084fc; font-size:11px; margin-bottom:6px;">RÉGULATION AUTO (VOIE UNIQUE 650KM)</h4>
 
-    <div class="telemetry-section">
-      <div class="telemetry-title">🔀 CROISEMENT OPTIMAL CALCULÉ</div>
-      <div style="font-size:10px; background:#1e293b; padding:8px; border-radius:6px; margin-bottom:6px;">
-        <div><b>Train M1 (Chargé) :</b> Descendant vers Port</div>
-        <div><b>Train V2 (Vide) :</b> Montant vers Zouérate</div>
-        <hr style="border-color:rgba(255,255,255,0.1); margin:4px 0;">
-        <div style="color:#f59e0b;"><b>Point Évitement Recommandé :</b> <span id="optMeetPoint">PK 460 (Choum)</span></div>
-        <div><b>Temps d'attente estimé :</b> <span id="optWaitTime">4 min</span></div>
-        <div><b>Gain Carburant :</b> <span style="color:#10b981;">-320 Litres</span></div>
-      </div>
-      <button class="btn" style="width:100%; background:#a855f7; justify-content:center;" onclick="applyDispatchOrder()">APPLIQUER ORDRE DE CROISEMENT</button>
-    </div>
-  </div>
+<div class="telemetry-section">
+<div class="telemetry-title">🔀 CROISEMENT OPTIMAL CALCULÉ</div>
+<div style="font-size:10px; background:#1e293b; padding:8px; border-radius:6px; margin-bottom:6px;">
+<div><b>Train M1 (Chargé) :</b> Descendant vers Port</div>
+<div><b>Train V2 (Vide) :</b> Montant vers Zouérate</div>
+<hr style="border-color:rgba(255,255,255,0.1); margin:4px 0;">
+<div style="color:#f59e0b;"><b>Point Évitement Recommandé :</b> <span id="optMeetPoint">PK 460 (Choum)</span></div>
+<div><b>Temps d'attente estimé :</b> <span id="optWaitTime">4 min</span></div>
+<div><b>Gain Carburant :</b> <span style="color:#10b981;">-320 Litres</span></div>
+</div>
+<button class="btn" style="width:100%; background:#a855f7; justify-content:center;" onclick="applyDispatchOrder()">APPLIQUER ORDRE DE CROISEMENT</button>
+</div>
+</div>
 
-  <!-- VUE 4 : BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER) -->
-  <div id="tabLedger" style="display: none;">
-    <h4 style="color:#10b981; font-size:11px; margin-bottom:6px;">BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER)</h4>
-    <div style="font-size:9px; color:#94a3b8; margin-bottom:6px;">Registre append-only chiffré des actions cabine et ordres reçus.</div>
-    <div id="ledgerLogs" style="font-family: monospace; font-size: 9px; background:#090d16; padding:6px; border-radius:6px; max-height:220px; overflow-y:auto; color:#10b981;">
-    </div>
-  </div>
+<!-- VUE 4 : BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER) -->
+<div id="tabLedger" style="display: none;">
+<h4 style="color:#10b981; font-size:11px; margin-bottom:6px;">BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER)</h4>
+<div style="font-size:9px; color:#94a3b8; margin-bottom:6px;">Registre append-only chiffré des actions cabine et ordres reçus.</div>
+<div id="ledgerLogs" style="font-family: monospace; font-size: 9px; background:#090d16; padding:6px; border-radius:6px; max-height:220px; overflow-y:auto; color:#10b981;">
+</div>
+</div>
 </div>
 
 <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
 <!-- BRIQUE 5 : VEILLE AUTOMATIQUE (DEADMAN SWITCH) UI -->
 <div class="deadman-container">
-  <div style="font-size:9px; font-weight:bold;">VEILLE AUTOMATIQUE</div>
-  <div class="deadman-progress"><div class="deadman-fill" id="deadmanProgress"></div></div>
-  <button class="deadman-btn" onclick="resetDeadmanSwitch()">RESET (ACK)</button>
+<div style="font-size:9px; font-weight:bold;">VEILLE AUTOMATIQUE</div>
+<div class="deadman-progress"><div class="deadman-fill" id="deadmanProgress"></div></div>
+<button class="deadman-btn" onclick="resetDeadmanSwitch()">RESET (ACK)</button>
 </div>
 
 <!-- MODAL AUTHENTIFICATION -->
 <div class="modal-overlay" id="authModal">
-  <div class="modal-card">
-    <div class="modal-title">🔐 AUTHENTIFICATION SÉCURISÉE SNIM IAM</div>
-    <form onsubmit="handleAuth(event)">
-      <div class="form-group">
-        <label>Matricule Agent SNIM :</label>
-        <input type="text" id="authMatricule" placeholder="Ex: AG-8492" required />
-      </div>
-      <div class="form-group">
-        <label>Mot de passe / Clé d'Accès :</label>
-        <input type="password" id="authPassword" placeholder="••••••••" required />
-      </div>
-      <div class="form-group">
-        <label>Rôle / Profil Opérationnel :</label>
-        <select id="authRole">
-          <option value="Conducteur Convoi">Conducteur Convoi Minéralier</option>
-          <option value="Chef de Secteur Voies">Chef de Secteur (Voies & Bâtiments)</option>
-          <option value="Régulateur PCD">Régulateur Central (PCD Nouadhibou/Zouérate)</option>
-        </select>
-      </div>
-      <div class="modal-actions">
-        <button type="submit" class="btn-submit" style="background:#0284c7;">S'AUTHENTIFIER (JWT/OIDC)</button>
-      </div>
-    </form>
-  </div>
+<div class="modal-card">
+<div class="modal-title">🔐 AUTHENTIFICATION SÉCURISÉE SNIM IAM</div>
+<form onsubmit="handleAuth(event)">
+<div class="form-group">
+<label>Matricule Agent SNIM :</label>
+<input type="text" id="authMatricule" placeholder="Ex: AG-8492" required />
+</div>
+<div class="form-group">
+<label>Mot de passe / Clé d'Accès :</label>
+<input type="password" id="authPassword" placeholder="••••••••" required />
+</div>
+<div class="form-group">
+<label>Rôle / Profil Opérationnel :</label>
+<select id="authRole">
+<option value="Conducteur Convoi">Conducteur Convoi Minéralier</option>
+<option value="Chef de Secteur Voies">Chef de Secteur (Voies & Bâtiments)</option>
+<option value="Régulateur PCD">Régulateur Central (PCD Nouadhibou/Zouérate)</option>
+</select>
+</div>
+<div class="modal-actions">
+<button type="submit" class="btn-submit" style="background:#0284c7;">S'AUTHENTIFIER (JWT/OIDC)</button>
+</div>
+</form>
+</div>
 </div>
 
 <!-- MODAL ANOMALIE -->
 <div class="modal-overlay" id="reportModal">
-  <div class="modal-card" style="border-color:#ef4444;">
-    <div class="modal-title" style="color:#ef4444;">⚠️ DÉCLARER UNE ANOMALIE TERRAIN</div>
-    <form onsubmit="submitReport(event)">
-      <div class="form-group">
-        <label>Identifiant Émetteur :</label>
-        <input type="text" id="repDriver" readonly style="opacity: 0.7;" />
-      </div>
-      <div class="form-group">
-        <label>Point Kilométrique (PK) :</label>
-        <select id="repPK">
-          <option value="PK 0 (Nouadhibou Port)">PK 0 - Nouadhibou Port</option>
-          <option value="PK 200 (Ben Amira)">PK 200 - Ben Amira</option>
-          <option value="PK 460 (Choum)">PK 460 - Passe de Choum</option>
-          <option value="PK 650 (F'Dérik)">PK 650 - F'Dérik</option>
-          <option value="PK 704 (Zouérate)">PK 704 - Zouérate</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Type d'incident :</label>
-        <select id="repType">
-          <option value="Ensablement de la voie (Dune)">🐫 Ensablement de la voie (Dune)</option>
-          <option value="Dromadaires proches/sur les rails">🐪 Dromadaires proches/sur les rails</option>
-          <option value="Anomalie de structure / Rail chaud">🛤️ Anomalie de structure / Rail chaud</option>
-          <option value="Panne / Problème mécanique">🔧 Panne / Problème mécanique</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Niveau de Gravité :</label>
-        <select id="repSeverity">
-          <option value="CRITIQUE">🔴 CRITIQUE (Arrêt Immédiat)</option>
-          <option value="MOYEN" selected>🟠 MOYEN (Ralentissement)</option>
-          <option value="INFO">🔵 INFO (Vigilance)</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Détails & Consignes :</label>
-        <textarea id="repDetails" rows="2" placeholder="Ex: Dune sur les rails au PK 460..."></textarea>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn-cancel" onclick="closeReportModal()">Annuler</button>
-        <button type="submit" class="btn-submit">TRANSMETTRE (MULTI-CANAL)</button>
-      </div>
-    </form>
-  </div>
+<div class="modal-card" style="border-color:#ef4444;">
+<div class="modal-title" style="color:#ef4444;">⚠️ DÉCLARER UNE ANOMALIE TERRAIN</div>
+<form onsubmit="submitReport(event)">
+<div class="form-group">
+<label>Identifiant Émetteur :</label>
+<input type="text" id="repDriver" readonly style="opacity: 0.7;" />
+</div>
+<div class="form-group">
+<label>Point Kilométrique (PK) :</label>
+<select id="repPK">
+<option value="PK 0 (Nouadhibou Port)">PK 0 - Nouadhibou Port</option>
+<option value="PK 200 (Ben Amira)">PK 200 - Ben Amira</option>
+<option value="PK 460 (Choum)">PK 460 - Passe de Choum</option>
+<option value="PK 650 (F'Dérik)">PK 650 - F'Dérik</option>
+<option value="PK 704 (Zouérate)">PK 704 - Zouérate</option>
+</select>
+</div>
+<div class="form-group">
+<label>Type d'incident :</label>
+<select id="repType">
+<option value="Ensablement de la voie (Dune)">🐫 Ensablement de la voie (Dune)</option>
+<option value="Dromadaires proches/sur les rails">🐪 Dromadaires proches/sur les rails</option>
+<option value="Anomalie de structure / Rail chaud">🛤️ Anomalie de structure / Rail chaud</option>
+<option value="Panne / Problème mécanique">🔧 Panne / Problème mécanique</option>
+</select>
+</div>
+<div class="form-group">
+<label>Niveau de Gravité :</label>
+<select id="repSeverity">
+<option value="CRITIQUE">🔴 CRITIQUE (Arrêt Immédiat)</option>
+<option value="MOYEN" selected>🟠 MOYEN (Ralentissement)</option>
+<option value="INFO">🔵 INFO (Vigilance)</option>
+</select>
+</div>
+<div class="form-group">
+<label>Détails & Consignes :</label>
+<textarea id="repDetails" rows="2" placeholder="Ex: Dune sur les rails au PK 460..."></textarea>
+</div>
+<div class="modal-actions">
+<button type="button" class="btn-cancel" onclick="closeReportModal()">Annuler</button>
+<button type="submit" class="btn-submit">TRANSMETTRE (MULTI-CANAL)</button>
+</div>
+</form>
+</div>
 </div>
 
 <div id="map"></div>
@@ -303,33 +304,34 @@ max-height: 75vh; overflow-y: auto; transition: transform 0.3s ease;
 // BRIQUE 4 : BOÎTE NOIRE INFALSIFIABLE (EDGE LEDGER IMMUTABLE)
 // =================================================================
 class EdgeLedger {
-  constructor() {
-    this.chain = [];
-  }
+constructor() {
+this.chain = [];
+}
 
-  async appendBlock(eventType, payload) {
-    const prevHash = this.chain.length > 0 ? this.chain[this.chain.length - 1].hash : "0000000000000000";
-    const timestamp = new Date().toISOString();
-    const blockData = JSON.stringify({ eventType, payload, prevHash, timestamp });
+async appendBlock(eventType, payload) {
+const prevHash = this.chain.length > 0 ? this.chain[this.chain.length - 1].hash : "0000000000000000";
+const timestamp = new Date().toISOString();
+const blockData = JSON.stringify({ eventType, payload, prevHash, timestamp });
 
-    const msgBuffer = new TextEncoder().encode(blockData);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// Cryptographic Hash SHA-256
+const msgBuffer = new TextEncoder().encode(blockData);
+const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+const hashArray = Array.from(new Uint8Array(hashBuffer));
+const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    const block = { index: this.chain.length, timestamp, eventType, payload, prevHash, hash };
-    this.chain.push(block);
-    this.renderLedgerUI(block);
-  }
+const block = { index: this.chain.length, timestamp, eventType, payload, prevHash, hash };
+this.chain.push(block);
+this.renderLedgerUI(block);
+}
 
-  renderLedgerUI(block) {
-    const container = document.getElementById('ledgerLogs');
-    if (!container) return;
-    const entry = document.createElement('div');
-    entry.style.cssText = "margin-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:2px;";
-    entry.innerHTML = `<span style="color:#f59e0b;">[${block.timestamp.substr(11,8)}]</span> <b>${block.eventType}</b><br/>Hash: <span style="color:#64748b;">${block.hash.substr(0,16)}...</span>`;
-    container.prepend(entry);
-  }
+renderLedgerUI(block) {
+const container = document.getElementById('ledgerLogs');
+if (!container) return;
+const entry = document.createElement('div');
+entry.style.cssText = "margin-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:2px;";
+entry.innerHTML = <span style="color:#f59e0b;"&gt;[${block.timestamp.substr(11,8)}]</span> <b>${block.eventType}&lt;/b&gt;&lt;br/&gt;Hash: &lt;span style="color:#64748b;"&gt;${block.hash.substr(0,16)}...</span>`;
+container.prepend(entry);
+}
 }
 const edgeLedger = new EdgeLedger();
 
@@ -337,23 +339,24 @@ const edgeLedger = new EdgeLedger();
 // BRIQUE 4 : RESILIENCE P2P WEBRTC MESH NETWORK INTER-TRAINS
 // =================================================================
 class TrainP2PMesh {
-  constructor() {
-    this.peerConnection = null;
-    this.dataChannel = null;
-    this.initMeshChannel();
-  }
+constructor() {
+this.peerConnection = null;
+this.dataChannel = null;
+this.initMeshChannel();
+}
 
-  initMeshChannel() {
-    try {
-      document.getElementById('meshBadge').innerText = "📡 P2P MESH: ACTIF";
-      edgeLedger.appendBlock("P2P_MESH_INIT", { status: "Network Mesh Ready" });
-    } catch(e) { console.warn("P2P Mesh non disponible"); }
-  }
+initMeshChannel() {
+try {
+// Simulation d'un canal P2P WebRTC local via Wi-Fi HaLow / Radio Cabine
+document.getElementById('meshBadge').innerText = "📡 P2P MESH: ACTIF";
+edgeLedger.appendBlock("P2P_MESH_INIT", { status: "Network Mesh Ready" });
+} catch(e) { console.warn("P2P Mesh non disponible"); }
+}
 
-  broadcastP2P(data) {
-    console.log("📡 Trame P2P diffusée aux trains à proximité :", data);
-    edgeLedger.appendBlock("P2P_BROADCAST", data);
-  }
+broadcastP2P(data) {
+console.log("📡 Trame P2P diffusée aux trains à proximité :", data);
+edgeLedger.appendBlock("P2P_BROADCAST", data);
+}
 }
 const p2pMesh = new TrainP2PMesh();
 
@@ -361,20 +364,20 @@ const p2pMesh = new TrainP2PMesh();
 // BRIQUE 5 : PASSERELLE HARDWARE-IN-THE-LOOP (WEBUSB / SERIAL J1939)
 // =================================================================
 async function connectWebUSBHardware() {
-  try {
-    if ('serial' in navigator) {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
-      document.getElementById('tHILStatus').innerText = "Connecté (USB CAN)";
-      document.getElementById('tHILStatus').style.color = "#10b981";
-      showToast("🔌 Passerelle Hardware J1939 connectée en direct !");
-      edgeLedger.appendBlock("HARDWARE_HIL_CONNECT", { port: "WebSerial USB J1939" });
-    } else {
-      showToast("⚠️ Interface WebSerial/WebUSB non supportée par ce navigateur.");
-    }
-  } catch(e) {
-    showToast("ℹ️ Connexion matérielle annulée ou non détectée.");
-  }
+try {
+if ('serial' in navigator) {
+const port = await navigator.serial.requestPort();
+await port.open({ baudRate: 115200 });
+document.getElementById('tHILStatus').innerText = "Connecté (USB CAN)";
+document.getElementById('tHILStatus').style.color = "#10b981";
+showToast("🔌 Passerelle Hardware J1939 connectée en direct !");
+edgeLedger.appendBlock("HARDWARE_HIL_CONNECT", { port: "WebSerial USB J1939" });
+} else {
+showToast("⚠️ Interface WebSerial/WebUSB non supportée par ce navigateur.");
+}
+} catch(e) {
+showToast("ℹ️ Connexion matérielle annulée ou non détectée.");
+}
 }
 
 // =================================================================
@@ -384,38 +387,38 @@ let deadmanTimer = 100;
 let deadmanInterval = null;
 
 function startDeadmanSwitch() {
-  if (deadmanInterval) clearInterval(deadmanInterval);
-  deadmanInterval = setInterval(() => {
-    deadmanTimer -= 2;
-    const fill = document.getElementById('deadmanProgress');
-    if (fill) fill.style.width = `${deadmanTimer}%`;
+if (deadmanInterval) clearInterval(deadmanInterval);
+deadmanInterval = setInterval(() => {
+deadmanTimer -= 2;
+const fill = document.getElementById('deadmanProgress');
+if (fill) fill.style.width = ``${deadmanTimer}%`;
 
-    if (deadmanTimer <= 0) {
-      playEmergencyBuzzer();
-      edgeLedger.appendBlock("DEADMAN_ALERT", { status: "Absence de réponse conducteur - Freinage auto préventif" });
-      showToast("🚨 ALERTE VEILLE AUTOMATIQUE : Confirmation requise !");
-      deadmanTimer = 100;
-    }
-  }, 1000);
+if (deadmanTimer <= 0) {
+playEmergencyBuzzer();
+edgeLedger.appendBlock("DEADMAN_ALERT", { status: "Absence de réponse conducteur - Freinage auto préventif" });
+showToast("🚨 ALERTE VEILLE AUTOMATIQUE : Confirmation requise !");
+deadmanTimer = 100;
+}
+}, 1000);
 }
 
 function resetDeadmanSwitch() {
-  deadmanTimer = 100;
-  const fill = document.getElementById('deadmanProgress');
-  if (fill) fill.style.width = '100%';
-  showToast("✅ Veille automatique acquittée.");
+deadmanTimer = 100;
+const fill = document.getElementById('deadmanProgress');
+if (fill) fill.style.width = 100%;
+showToast("✅ Veille automatique acquittée.");
 }
 
 function playEmergencyBuzzer() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(900, ctx.currentTime);
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
-  } catch(e) {}
+try {
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+const osc = ctx.createOscillator();
+osc.type = 'sawtooth';
+osc.frequency.setValueAtTime(900, ctx.currentTime);
+osc.connect(ctx.destination);
+osc.start();
+osc.stop(ctx.currentTime + 0.5);
+} catch(e) {}
 }
 
 // =================================================================
@@ -424,76 +427,77 @@ function playEmergencyBuzzer() {
 let aiModelLoaded = false;
 
 async function initTinyMLEngine() {
-  try {
-    aiModelLoaded = true;
-    setInterval(runTinyMLInference, 5000);
-  } catch(e) {}
+try {
+// Simulation / Chargement modèle léger TinyML
+aiModelLoaded = true;
+setInterval(runTinyMLInference, 5000);
+} catch(e) {}
 }
 
 function runTinyMLInference() {
-  if (!aiModelLoaded) return;
-  const vib = (0.02 + Math.random() * 0.05).toFixed(3);
-  const oil = (4.0 + Math.random() * 0.4).toFixed(1);
-  const engineAnomalyRisk = (Math.random() * 2).toFixed(1);
+if (!aiModelLoaded) return;
+const vib = (0.02 + Math.random() * 0.05).toFixed(3);
+const oil = (4.0 + Math.random() * 0.4).toFixed(1);
+const engineAnomalyRisk = (Math.random() * 2).toFixed(1);
 
-  document.getElementById('aiVib').innerText = `${vib} g (Normal)`; 
-  document.getElementById('aiOil').innerText = `${oil} bar (Nominal)`;
-  document.getElementById('aiPredictEngine').innerText = `${engineAnomalyRisk}% (Normal)`;
+document.getElementById('aiVib').innerText = ${vib} g (Normal); document.getElementById('aiOil').innerText = ``${oil} bar (Nominal);
+document.getElementById('aiPredictEngine').innerText = ${engineAnomalyRisk}% (Normal)`;
 
-  if (parseFloat(vib) > 0.06) {
-    document.getElementById('aiPredictEngine').innerText = "CRITIQUE: Surchauffe essieu détectée!";
-    document.getElementById('aiPredictEngine').style.color = "#ef4444";
-    edgeLedger.appendBlock("TINYML_ANOMALY", { vib, oil });
-  }
+if (parseFloat(vib) > 0.06) {
+document.getElementById('aiPredictEngine').innerText = CRITIQUE: Surchauffe essieu détectée!;
+document.getElementById('aiPredictEngine').style.color = "#ef4444";
+edgeLedger.appendBlock("TINYML_ANOMALY", { vib, oil });
+}
 }
 
 let isCamRunning = false;
 let webcamStream = null;
 
 async function toggleCamAI() {
-  const container = document.getElementById('cameraVisionContainer');
-  const video = document.getElementById('webcamVideo');
+const container = document.getElementById('cameraVisionContainer');
+const video = document.getElementById('webcamVideo');
 
-  if (!isCamRunning) {
-    try {
-      webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      video.srcObject = webcamStream;
-      container.style.display = 'block';
-      isCamRunning = true;
-      showToast("👁️ Vision par ordinateur activée (Caméra Cabine)");
-      switchTab('ai');
-      startComputerVisionDetection();
-    } catch(e) {
-      showToast("⚠️ Accès caméra refusé ou indisponible.");
-    }
-  } else {
-    if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
-    container.style.display = 'none';
-    isCamRunning = false;
-  }
+if (!isCamRunning) {
+try {
+webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+video.srcObject = webcamStream;
+container.style.display = 'block';
+isCamRunning = true;
+showToast("👁️ Vision par ordinateur activée (Caméra Cabine)");
+switchTab('ai');
+startComputerVisionDetection();
+} catch(e) {
+showToast("⚠️ Accès caméra refusé ou indisponible.");
+}
+} else {
+if (webcamStream) webcamStream.getTracks().forEach(t => t.stop());
+container.style.display = 'none';
+isCamRunning = false;
+}
 }
 
 function startComputerVisionDetection() {
-  if (!isCamRunning) return;
-  const resultLabel = document.getElementById('aiDetectResult');
-  const simulatedDetections = [
-    "Voie dégagée (100%)",
-    "Voie dégagée (99%)",
-    "🐫 Obstacle détecté: Dromadaire (PK 461) - Confiance 94%",
-    "Voie dégagée (98%)"
-  ];
-  const randomDet = simulatedDetections[Math.floor(Math.random() * simulatedDetections.length)];
-  resultLabel.innerText = randomDet;
+if (!isCamRunning) return;
+// Analyse simulée par vision par ordinateur sur les frames de la vidéo
+const resultLabel = document.getElementById('aiDetectResult');
+const simulatedDetections = [
+"Voie dégagée (100%)",
+"Voie dégagée (99%)",
+"🐫 Obstacle détecté: Dromadaire (PK 461) - Confiance 94%",
+"Voie dégagée (98%)"
+ ];
+const randomDet = simulatedDetections[Math.floor(Math.random() * simulatedDetections.length)];
+resultLabel.innerText = randomDet;
 
-  if (randomDet.includes("Dromadaire")) {
-    resultLabel.style.color = "#ef4444";
-    playEmergencyBuzzer();
-    edgeLedger.appendBlock("CV_OBSTACLE_DETECTED", { label: randomDet });
-  } else {
-    resultLabel.style.color = "#10b981";
-  }
+if (randomDet.includes("Dromadaire")) {
+resultLabel.style.color = "#ef4444";
+playEmergencyBuzzer();
+edgeLedger.appendBlock("CV_OBSTACLE_DETECTED", { label: randomDet });
+} else {
+resultLabel.style.color = "#10b981";
+}
 
-  if (isCamRunning) setTimeout(startComputerVisionDetection, 4000);
+if (isCamRunning) setTimeout(startComputerVisionDetection, 4000);
 }
 
 // =================================================================
@@ -503,80 +507,82 @@ let twinScene, twinCamera, twinRenderer, twinRailMesh;
 let is3DInitialized = false;
 
 function toggleDigitalTwin() {
-  const container = document.getElementById('digitalTwinContainer');
-  if (container.style.display === 'block') {
-    container.style.display = 'none';
-  } else {
-    container.style.display = 'block';
-    if (!is3DInitialized) initDigitalTwin3D();
-  }
+const container = document.getElementById('digitalTwinContainer');
+if (container.style.display === 'block') {
+container.style.display = 'none';
+} else {
+container.style.display = 'block';
+if (!is3DInitialized) initDigitalTwin3D();
+}
 }
 
 function initDigitalTwin3D() {
-  const container = document.getElementById('digitalTwinContainer');
-  twinScene = new THREE.Scene();
-  twinCamera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+const container = document.getElementById('digitalTwinContainer');
+twinScene = new THREE.Scene();
+twinCamera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
 
-  twinRenderer = new THREE.WebGLRenderer({ antialias: true });
-  twinRenderer.setSize(container.clientWidth, container.clientHeight);
-  container.appendChild(twinRenderer.domElement);
+twinRenderer = new THREE.WebGLRenderer({ antialias: true });
+twinRenderer.setSize(container.clientWidth, container.clientHeight);
+container.appendChild(twinRenderer.domElement);
 
-  const geometry = new THREE.BoxGeometry(1, 0.2, 20);
-  const material = new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true });
-  twinRailMesh = new THREE.Mesh(geometry, material);
-  twinScene.add(twinRailMesh);
+// Création synthétique du rail 3D
+const geometry = new THREE.BoxGeometry(1, 0.2, 20);
+const material = new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true });
+twinRailMesh = new THREE.Mesh(geometry, material);
+twinScene.add(twinRailMesh);
 
-  twinCamera.position.set(0, 2, 5);
-  twinCamera.lookAt(0, 0, 0);
+twinCamera.position.set(0, 2, 5);
+twinCamera.lookAt(0, 0, 0);
 
-  function animate3D() {
-    requestAnimationFrame(animate3D);
-    twinRailMesh.rotation.y += 0.005;
-    twinRenderer.render(twinScene, twinCamera);
-  }
-  animate3D();
-  is3DInitialized = true;
+function animate3D() {
+requestAnimationFrame(animate3D);
+twinRailMesh.rotation.y += 0.005;
+twinRenderer.render(twinScene, twinCamera);
+}
+animate3D();
+is3DInitialized = true;
 }
 
+// Calcul physique de la dilatation thermique de l'acier des rails
 function calculateRailThermalExpansion(tempCelsius) {
-  const alphaSteel = 12e-6; 
-  const baseTemp = 20; 
-  const deltaT = Math.max(0, tempCelsius - baseTemp);
-  const expansionPerMeter = (alphaSteel * deltaT * 1000).toFixed(2);
+const alphaSteel = 12e-6; // Coefficient de dilatation linéaire ($\text{K}^{-1}$)
+const baseTemp = 20; // Température de pose neutre
+const deltaT = Math.max(0, tempCelsius - baseTemp);
+const expansionPerMeter = (alphaSteel * deltaT * 1000).toFixed(2); // mm/m
 
-  document.getElementById('tRailExpansion').innerText = `+${expansionPerMeter} mm/m`;
+document.getElementById('tRailExpansion').innerText = +${expansionPerMeter} mm/m`;
 
-  const riskElement = document.getElementById('tBucklingRisk');
-  if (tempCelsius > 52) {
-    riskElement.innerText = "CRITIQUE (Risque Voilement/Flambement)";
-    riskElement.style.color = "#ef4444";
-  } else if (tempCelsius > 45) {
-    riskElement.innerText = "MODÉRÉ (Vitesse max 40 km/h)";
-    riskElement.style.color = "#f59e0b";
-  } else {
-    riskElement.innerText = "FAIBLE";
-    riskElement.style.color = "#10b981";
-  }
+const riskElement = document.getElementById('tBucklingRisk');
+if (tempCelsius > 52) {
+riskElement.innerText = "CRITIQUE (Risque Voilement/Flambement)";
+riskElement.style.color = "#ef4444";
+} else if (tempCelsius > 45) {
+riskElement.innerText = "MODÉRÉ (Vitesse max 40 km/h)";
+riskElement.style.color = "#f59e0b";
+} else {
+riskElement.innerText = "FAIBLE";
+riskElement.style.color = "#10b981";
+}
 }
 
 // =================================================================
 // BRIQUE 3 : DISPATCHING AUTOMATISÉ ET RECHERCHE OPÉRATIONNELLE
 // =================================================================
 function triggerDispatchOptimization() {
-  switchTab('dispatch');
-  showToast("🧠 Optimisation algorithmique du croisement en cours...");
+switchTab('dispatch');
+showToast("🧠 Optimisation algorithmique du croisement en cours...");
 
-  setTimeout(() => {
-    document.getElementById('optMeetPoint').innerText = "PK 460 (Passe de Choum)";
-    document.getElementById('optWaitTime').innerText = "3 minutes";
-    showToast("✅ Plan de croisement optimal calculé avec succès.");
-    edgeLedger.appendBlock("DISPATCH_OPTIMIZED", { meetPK: "PK 460", savingsFuelLiters: 320 });
-  }, 1200);
+setTimeout(() => {
+document.getElementById('optMeetPoint').innerText = "PK 460 (Passe de Choum)";
+document.getElementById('optWaitTime').innerText = "3 minutes";
+showToast("✅ Plan de croisement optimal calculé avec succès.");
+edgeLedger.appendBlock("DISPATCH_OPTIMIZED", { meetPK: "PK 460", savingsFuelLiters: 320 });
+}, 1200);
 }
 
 function applyDispatchOrder() {
-  showToast("📡 Ordre de croisement transmis par P2P et Réseau Central");
-  p2pMesh.broadcastP2P({ action: "CROSSING_ORDER", pk: 460 });
+showToast("📡 Ordre de croisement transmis par P2P et Réseau Central");
+p2pMesh.broadcastP2P({ action: "CROSSING_ORDER", pk: 460 });
 }
 
 // =================================================================
@@ -586,127 +592,115 @@ let voiceRecognition = null;
 let isVoiceActive = false;
 
 function toggleVoiceControl() {
-  const btn = document.getElementById('btnVoice');
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    showToast("⚠️ Reconnaissance vocale non supportée sur ce terminal.");
-    return;
-  }
+const btn = document.getElementById('btnVoice');
+if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+showToast("⚠️ Reconnaissance vocale non supportée sur ce terminal.");
+return;
+}
 
-  if (!isVoiceActive) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    voiceRecognition = new SpeechRecognition();
-    voiceRecognition.continuous = true;
-    voiceRecognition.lang = 'fr-FR';
+if (!isVoiceActive) {
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+voiceRecognition = new SpeechRecognition();
+voiceRecognition.continuous = true;
+voiceRecognition.lang = 'fr-FR';
 
-    voiceRecognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-      console.log("🎙️ Vocale reçue :", transcript);
+voiceRecognition.onresult = (event) => {
+const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+console.log("🎙️ Vocale reçue :", transcript);
 
-      if (transcript.includes("anomalie") || transcript.includes("alerte")) {
-        openReportModal();
-        showToast("🎙️ Commande : Ouverture modal anomalie");
-      } else if (transcript.includes("arrêt") || transcript.includes("urgence")) {
-        playEmergencyBuzzer();
-        showToast("🚨 Commande Vocale : Arrêt d'Urgence !");
-        edgeLedger.appendBlock("VOICE_EMERGENCY_STOP", { raw: transcript });
-      }
-    };
+if (transcript.includes("anomalie") || transcript.includes("alerte")) {
+openReportModal();
+showToast("🎙️ Commande : Ouverture modal anomalie");
+} else if (transcript.includes("arrêt") || transcript.includes("urgence")) {
+playEmergencyBuzzer();
+showToast("🚨 Commande Vocale : Arrêt d'Urgence !");
+edgeLedger.appendBlock("VOICE_EMERGENCY_STOP", { raw: transcript });
+}
+};
 
-    voiceRecognition.start();
-    isVoiceActive = true;
-    btn.innerText = "🎙️ VOCAL: ON";
-    btn.classList.add('btn-active');
-    showToast("🎙️ Reconnaissance vocale activée (Parlez en langage naturel)");
-  } else {
-    if (voiceRecognition) voiceRecognition.stop();
-    isVoiceActive = false;
-    btn.innerText = "🎙️ VOCAL: OFF";
-    btn.classList.remove('btn-active');
-  }
+voiceRecognition.start();
+isVoiceActive = true;
+btn.innerText = "🎙️ VOCAL: ON";
+btn.classList.add('btn-active');
+showToast("🎙️ Reconnaissance vocale activée (Parlez en langage naturel)");
+} else {
+if (voiceRecognition) voiceRecognition.stop();
+isVoiceActive = false;
+btn.innerText = "🎙️ VOCAL: OFF";
+btn.classList.remove('btn-active');
+}
 }
 
 function toggleSunMode() {
-  document.body.classList.toggle('sun-mode');
-  const isSun = document.body.classList.contains('sun-mode');
-  document.getElementById('btnSun').classList.toggle('btn-active', isSun);
-  showToast(isSun ? "☀️ Mode haute lisibilité plein soleil désert activé" : "🌙 Mode standard réactivé");
+document.body.classList.toggle('sun-mode');
+const isSun = document.body.classList.contains('sun-mode');
+document.getElementById('btnSun').classList.toggle('btn-active', isSun);
+showToast(isSun ? "☀️ Mode haute lisibilité plein soleil désert activé" : "🌙 Mode standard réactivé");
 }
 
 // =================================================================
 // SÉCURITÉ AES-256 & DB LOCALE INDEXEDDB
 // =================================================================
 class SecurityManager {
-  constructor() { this.sessionKey = null; }
-  async initSessionKey(userToken) {
-    try {
-      const encoder = new TextEncoder();
-      const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(userToken), "PBKDF2", false, ["deriveKey"]);
-      this.sessionKey = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt: encoder.encode("SNIM_SALT_2026"), iterations: 100000, hash: "SHA-256" },
-        keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
-      );
-    } catch(e) {}
-  }
+constructor() { this.sessionKey = null; }
+async initSessionKey(userToken) {
+try {
+const encoder = new TextEncoder();
+const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(userToken), "PBKDF2", false, ["deriveKey"]);
+this.sessionKey = await crypto.subtle.deriveKey(
+{ name: "PBKDF2", salt: encoder.encode("SNIM_SALT_2026"), iterations: 100000, hash: "SHA-256" },
+keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+);
+} catch(e) {}
+}
 }
 const securityManager = new SecurityManager();
 
 class LocalDB {
-  constructor() { this.dbName = 'SNIM_RailOS_Enterprise'; this.db = null; }
-  async init() {
-    return new Promise((resolve) => {
-      const req = indexedDB.open(this.dbName, 1);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('reports')) db.createObjectStore('reports', { keyPath: 'id', autoIncrement: true });
-      };
-      req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
-    });
-  }
-  async saveReport(report) {
-    return new Promise((resolve) => {
-      const tx = this.db.transaction('reports', 'readwrite');
-      tx.objectStore('reports').add(report);
-      resolve();
-    });
-  }
+constructor() { this.dbName = 'SNIM_RailOS_Enterprise'; this.db = null; }
+async init() {
+return new Promise((resolve) => {
+const req = indexedDB.open(this.dbName, 1);
+req.onupgradeneeded = (e) => {
+const db = e.target.result;
+if (!db.objectStoreNames.contains('reports')) db.createObjectStore('reports', { keyPath: 'id', autoIncrement: true });
+};
+req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+});
+}
+async saveReport(report) {
+return new Promise((resolve) => {
+const tx = this.db.transaction('reports', 'readwrite');
+tx.objectStore('reports').add(report);
+resolve();
+});
+}
 }
 const localDB = new LocalDB();
 localDB.init();
 
 // =================================================================
-// CARTE LEAFLET (HYBRIDE SATELLITE + NOM DES VILLES / REPERES)
+// CARTE LEAFLET & TRACÉ FERROVIAIRE SNIM
 // =================================================================
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
-
-// 1. Layer Fond Satellite HD
-L.tileLayer('[https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/){z}/{y}/{x}', { 
-  maxZoom: 19 
-}).addTo(map);
-
-// 2. Layer Overlay Noms des Villes et Frontières (Résout la lisibilité cartographique)
-L.tileLayer('[https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/](https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/){z}/{y}/{x}', {
-  maxZoom: 19
-}).addTo(map);
-
-// Forcer le recalcul de la taille Leaflet
-setTimeout(() => { map.invalidateSize(); }, 300);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
 
 const snimTrackPoints = [
-  [22.7441, -12.4789], [22.6800, -12.7000], [22.1000, -12.8500],
-  [21.3000, -13.0000], [21.3200, -14.5000], [21.2000, -15.5000],
-  [21.0000, -16.2000], [20.9322, -17.0342]
+[22.7441, -12.4789], [22.6800, -12.7000], [22.1000, -12.8500],
+[21.3000, -13.0000], [21.3200, -14.5000], [21.2000, -15.5000],
+[21.0000, -16.2000], [20.9322, -17.0342]
 ];
 L.polyline(snimTrackPoints, { color: '#f59e0b', weight: 5, dashArray: '8, 10' }).addTo(map);
 
 const pkMarkers = [
-  { name: "PK 704 (Zouérate Mine)", coords: [22.7441, -12.4789] },
-  { name: "PK 650 (F'Dérik)", coords: [22.6800, -12.7000] },
-  { name: "PK 460 (Choum)", coords: [21.3000, -13.0000] },
-  { name: "PK 200 (Ben Amira)", coords: [21.0000, -16.2000] },
-  { name: "PK 0 (Nouadhibou Port)", coords: [20.9322, -17.0342] }
+{ name: "PK 704 (Zouérate Mine)", coords: [22.7441, -12.4789] },
+{ name: "PK 650 (F'Dérik)", coords: [22.6800, -12.7000] },
+{ name: "PK 460 (Choum)", coords: [21.3000, -13.0000] },
+{ name: "PK 200 (Ben Amira)", coords: [21.0000, -16.2000] },
+{ name: "PK 0 (Nouadhibou Port)", coords: [20.9322, -17.0342] }
 ];
 pkMarkers.forEach(pk => {
-  L.marker(pk.coords, { icon: L.divIcon({ className: 'custom-pk', html: `<div class="pk-badge">📍 ${pk.name}</div>`, iconAnchor: [30, 10] }) }).addTo(map);
+L.marker(pk.coords, { icon: L.divIcon({ className: 'custom-pk', html: <div class="pk-badge"&gt;📍 ${pk.name}</div>`, iconAnchor: [30, 10] }) }).addTo(map);
 });
 
 // =================================================================
@@ -715,98 +709,92 @@ pkMarkers.forEach(pk => {
 let currentUser = JSON.parse(sessionStorage.getItem('snim_token_session') || 'null');
 
 function generateMockJWT(matricule, role) {
-  return `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: matricule, role }))}.SIGNATURE`;
+return eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: matricule, role }))}.SIGNATURE`;
 }
 
 async function updateUIForUser() {
-  const badge = document.getElementById('userRoleBadge');
-  const authBtn = document.getElementById('btnAuthToggle');
-  if (currentUser && currentUser.token) {
-    badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
-    document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
-    authBtn.innerText = "🔓 DÉCONNEXION";
-    document.getElementById('authModal').style.setProperty('display', 'none', 'important');
-    await securityManager.initSessionKey(currentUser.token);
-  } else {
-    badge.innerText = "NON CONNECTÉ";
-    authBtn.innerText = "🔑 AGENT";
-    document.getElementById('authModal').style.setProperty('display', 'flex', 'important');
-  }
+const badge = document.getElementById('userRoleBadge');
+const authBtn = document.getElementById('btnAuthToggle');
+if (currentUser && currentUser.token) {
+badge.innerText = ${currentUser.matricule} (${currentUser.role});
+document.getElementById('repDriver').value = ${currentUser.matricule} - ${currentUser.role};
+authBtn.innerText = "🔓 DÉCONNEXION";
+document.getElementById('authModal').style.setProperty('display', 'none', 'important');
+await securityManager.initSessionKey(currentUser.token);
+} else {
+badge.innerText = "NON CONNECTÉ";
+authBtn.innerText = "🔑 AGENT";
+document.getElementById('authModal').style.setProperty('display', 'flex', 'important');
+}
 }
 
 function handleAuthButtonClick() {
-  if (currentUser) {
-    currentUser = null;
-    sessionStorage.removeItem('snim_token_session');
-    updateUIForUser();
-  } else { document.getElementById('authModal').style.setProperty('display', 'flex', 'important'); }
+if (currentUser) {
+currentUser = null;
+sessionStorage.removeItem('snim_token_session');
+updateUIForUser();
+} else { document.getElementById('authModal').style.setProperty('display', 'flex', 'important'); }
 }
 
 async function handleAuth(e) {
-  e.preventDefault();
-  const matricule = document.getElementById('authMatricule').value;
-  const role = document.getElementById('authRole').value;
-  currentUser = { matricule, role, token: generateMockJWT(matricule, role) };
-  sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
-  await updateUIForUser();
-  showToast(`🔑 Connecté : Agent ${matricule}`);
-  edgeLedger.appendBlock("USER_LOGIN", { matricule, role });
+e.preventDefault();
+const matricule = document.getElementById('authMatricule').value;
+const role = document.getElementById('authRole').value;
+currentUser = { matricule, role, token: generateMockJWT(matricule, role) };
+sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
+await updateUIForUser();
+showToast(🔑 Connecté : Agent ${matricule}`);
+edgeLedger.appendBlock("USER_LOGIN", { matricule, role });
 }
 
 function toggleNightMode() {
-  document.getElementById('map').classList.toggle('night-mode');
+document.getElementById('map').classList.toggle('night-mode');
 }
 function toggleSidePanel() { document.getElementById('sidePanel').classList.toggle('collapsed'); }
 
 function switchTab(tab) {
-  ['Live', 'AI', 'Dispatch', 'Ledger'].forEach(t => {
-    const el = document.getElementById(`tab${t}`);
-    const btn = document.getElementById(`tab${t}Btn`);
-    if (el) el.style.display = 'none';
-    if (btn) btn.classList.remove('active');
-  });
-  
-  const targetTab = tab.charAt(0).toUpperCase() + tab.slice(1);
-  const activeEl = document.getElementById(`tab${targetTab}`);
-  const activeBtn = document.getElementById(`tab${targetTab}Btn`);
-  
-  if (activeEl) activeEl.style.display = 'block';
-  if (activeBtn) activeBtn.classList.add('active');
+['Live', 'AI', 'Dispatch', 'Ledger'].forEach(t => {
+const el = document.getElementById(tab${t}); const btn = document.getElementById(tablatex
+{t}Btn`); if (el) el.style.display = 'none'; if (btn) btn.classList.remove('active'); }); const activeEl = document.getElementById(`tab
+
+{tab.charAt(0).toUpperCase() + tab.slice(1)}); const activeBtn = document.getElementById(tab${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn);
+if (activeEl) activeEl.style.display = 'block';
+if (activeBtn) activeBtn.classList.add('active');
 }
 
 function showToast(msg) {
-  const toast = document.getElementById('toast');
-  toast.innerText = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
+const toast = document.getElementById('toast');
+toast.innerText = msg;
+toast.classList.add('show');
+setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
 function openReportModal() { document.getElementById('reportModal').style.display = 'flex'; }
 function closeReportModal() { document.getElementById('reportModal').style.display = 'none'; }
 
 async function submitReport(e) {
-  e.preventDefault();
-  const pk = document.getElementById('repPK').value;
-  const type = document.getElementById('repType').value;
-  const severity = document.getElementById('repSeverity').value;
-  const details = document.getElementById('repDetails').value;
-  const report = { pk, type, severity, details, driver: currentUser ? currentUser.matricule : "ANONYME", time: new Date().toLocaleTimeString() };
+e.preventDefault();
+const pk = document.getElementById('repPK').value;
+const type = document.getElementById('repType').value;
+const severity = document.getElementById('repSeverity').value;
+const details = document.getElementById('repDetails').value;
+const report = { pk, type, severity, details, driver: currentUser.matricule, time: new Date().toLocaleTimeString() };
 
-  await localDB.saveReport(report);
-  p2pMesh.broadcastP2P({ action: "NEW_REPORT", report });
-  edgeLedger.appendBlock("REPORT_SUBMITTED", report);
+await localDB.saveReport(report);
+p2pMesh.broadcastP2P({ action: "NEW_REPORT", report });
+edgeLedger.appendBlock("REPORT_SUBMITTED", report);
 
-  showToast("⚡ Rapport transmis via 4G / P2P Mesh !");
-  closeReportModal();
+showToast("⚡ Rapport transmis via 4G / P2P Mesh !");
+closeReportModal();
 }
 
 // =================================================================
 // SIMULATION TEMPS RÉEL (FLOTTE & MÉTÉO DES RAILS)
 // =================================================================
 function updateTelemetry() {
-  const currentTemp = 44 + Math.floor(Math.random() * 10);
-  document.getElementById('tRailTemp').innerText = `${currentTemp}°C`;
-  calculateRailThermalExpansion(currentTemp);
+const currentTemp = 44 + Math.floor(Math.random() * 10);
+document.getElementById('tRailTemp').innerText = ``${currentTemp}°C`;
+calculateRailThermalExpansion(currentTemp);
 }
 
 // INITIALISATION GENERALE
@@ -816,4 +804,4 @@ initTinyMLEngine();
 setInterval(updateTelemetry, 4000);
 </script>
 </body>
-</html>
+  </html>
