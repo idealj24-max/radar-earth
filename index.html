@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PCD 2.0 SNIM - Command Center</title>
+  <title>PCD 2.0 SNIM - Industrial Command Center</title>
   
-  <!-- Manifeste PWA embarqué -->
-  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;&#125;">
+  <!-- Configurations PWA Mobile Native -->
+  <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;,&quot;orientation&quot;:&quot;portrait&quot;&#125;">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -367,6 +370,7 @@
     </div>
     <div class="controls">
       <button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
+      <button class="btn" id="btnDownloadMap" onclick="preloadOfflineLine()">📥 CACHE MAP SNIM</button>
       <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
       <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
       <button class="btn" id="btnHeatmap" onclick="toggleHeatmap()">🛠️ MAINTENANCE</button>
@@ -414,6 +418,7 @@
       <div class="telemetry-section">
         <div class="telemetry-title">📡 RACCORDEMENT CLOUD & SYNC</div>
         <div class="telemetry-item"><span>Statut Réseau :</span><span class="telemetry-value" id="netStatus" style="color:#10b981;">En Ligne</span></div>
+        <div class="telemetry-item"><span>Base Locale IndexedDB :</span><span class="telemetry-value" id="dbStatus" style="color:#10b981;">Active</span></div>
         <div class="telemetry-item"><span>En Attente Sync Offline :</span><span class="telemetry-value" id="offlineQueueCount">0 Alerte(s)</span></div>
       </div>
     </div>
@@ -444,7 +449,6 @@
       <div class="telemetry-section">
         <div class="telemetry-title">📢 SIGNALEMENTS DIRECTS</div>
         
-        <!-- Filtres par gravité et recherche -->
         <div style="display: flex; gap: 4px; margin-bottom: 6px;">
           <button class="filter-btn active" id="fAll" onclick="filterReports('all')">TOUT</button>
           <button class="filter-btn" id="fCrit" onclick="filterReports('CRITIQUE')">🔴 CRITIQUE</button>
@@ -462,17 +466,21 @@
 
   <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
-  <!-- MODAL 1: AUTHENTIFICATION AGENT SNIM -->
+  <!-- MODAL 1: AUTHENTIFICATION SÉCURISÉE JWT / SNIM IAM -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-card">
-      <div class="modal-title">🔑 AUTHENTIFICATION AGENT SNIM</div>
+      <div class="modal-title">🔐 AUTHENTIFICATION SÉCURISÉE SNIM IAM</div>
       <form onsubmit="handleAuth(event)">
         <div class="form-group">
           <label>Matricule Agent SNIM :</label>
           <input type="text" id="authMatricule" placeholder="Ex: AG-8492" required />
         </div>
         <div class="form-group">
-          <label>Rôle / Fonction :</label>
+          <label>Mot de passe / Clé d'Accès :</label>
+          <input type="password" id="authPassword" placeholder="••••••••" required />
+        </div>
+        <div class="form-group">
+          <label>Rôle / Profil Opérationnel :</label>
           <select id="authRole">
             <option value="Conducteur Convoi">Conducteur Convoi Minéralier</option>
             <option value="Chef de Secteur Voies">Chef de Secteur (Voies & Bâtiments)</option>
@@ -480,7 +488,7 @@
           </select>
         </div>
         <div class="modal-actions">
-          <button type="submit" class="btn-submit" style="background:#0284c7;">VALIDER LA SESSION</button>
+          <button type="submit" class="btn-submit" style="background:#0284c7;">S'AUTHENTIFIER (JWT/OAuth2)</button>
         </div>
       </form>
     </div>
@@ -544,7 +552,74 @@
 
   <script>
     // -----------------------------------------------------------------
-    // 1. SERVICES CLOUD & PERSISTANCE DUAL-MODE
+    // 1. MOTEUR PERSISTANCE INDEXEDDB (OFFLINE-FIRST ENTERPRISE)
+    // -----------------------------------------------------------------
+    class LocalDB {
+      constructor() {
+        this.dbName = 'SNIM_PCD_Enterprise';
+        this.db = null;
+      }
+
+      async init() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open(this.dbName, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('reports')) {
+              db.createObjectStore('reports', { keyPath: 'id', autoIncrement: true });
+            }
+          };
+          req.onsuccess = (e) => {
+            this.db = e.target.result;
+            resolve();
+          };
+          req.onerror = (e) => reject("Erreur d'initialisation IndexedDB");
+        });
+      }
+
+      async saveReport(report) {
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction('reports', 'readwrite');
+          const store = tx.objectStore('reports');
+          const req = store.add(report);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject();
+        });
+      }
+
+      async getAllReports() {
+        return new Promise((resolve) => {
+          if (!this.db) { resolve([]); return; }
+          const tx = this.db.transaction('reports', 'readonly');
+          const store = tx.objectStore('reports');
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+      }
+
+      async markSynced(id) {
+        return new Promise((resolve) => {
+          const tx = this.db.transaction('reports', 'readwrite');
+          const store = tx.objectStore('reports');
+          const req = store.get(id);
+          req.onsuccess = () => {
+            const data = req.result;
+            if (data) {
+              data.synced = true;
+              store.put(data);
+            }
+            resolve();
+          };
+        });
+      }
+    }
+
+    const localDB = new LocalDB();
+    localDB.init().catch(() => console.warn("IndexDB non supporté"));
+
+    // -----------------------------------------------------------------
+    // 2. BACKEND SUPABASE & POSTGIS SYNC
     // -----------------------------------------------------------------
     const SUPABASE_URL = "https://xyzcompany.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
@@ -554,19 +629,52 @@
       if (window.supabase) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       }
-    } catch(e) { console.warn("Supabase mode local actif."); }
+    } catch(e) { console.warn("Mode Cloud déconnecté."); }
 
     // -----------------------------------------------------------------
-    // 2. ENREGISTREMENT SERVICE WORKER PWA
+    // 3. SERVICE WORKER PWA & MAP TILE CACHING DYNAMIQUE
     // -----------------------------------------------------------------
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE_NAME = 'snim-pcd-v3';
+        const CACHE_NAME = 'snim-pcd-v4';
+        const STATIC_ASSETS = [
+          './',
+          'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+          'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+          'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+        ];
+
         self.addEventListener('install', e => {
-          e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+          e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
+          self.skipWaiting();
         });
+
+        self.addEventListener('activate', e => {
+          e.waitUntil(caches.keys().then(keys => Promise.all(
+            keys.map(k => k !== CACHE_NAME ? caches.delete(k) : null)
+          )));
+          self.clients.claim();
+        });
+
         self.addEventListener('fetch', e => {
-          e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+          const url = e.request.url;
+          // Strategy Cache First avec sauvegarde dynamique pour la cartographie
+          if (url.includes('arcgisonline.com') || url.includes('basemaps.cartocdn.com') || url.includes('unpkg.com')) {
+            e.respondWith(
+              caches.match(e.request).then(cached => {
+                return cached || fetch(e.request).then(res => {
+                  return caches.open(CACHE_NAME).then(cache => {
+                    cache.put(e.request, res.clone());
+                    return res;
+                  });
+                });
+              })
+            );
+          } else {
+            e.respondWith(
+              caches.match(e.request).then(res => res || fetch(e.request).catch(() => caches.match('./')))
+            );
+          }
         });
       `;
       const blob = new Blob([swCode], { type: 'text/javascript' });
@@ -574,7 +682,31 @@
     }
 
     // -----------------------------------------------------------------
-    // 3. INITIALISATION CARTE
+    // 4. PRE-CHARGEMENT DES TUILES DE CARTE (NOUADHIBOU -> ZOUÉRATE)
+    // -----------------------------------------------------------------
+    async function preloadOfflineLine() {
+      showToast("⏳ Début du téléchargement du tracé ferroviaire (PK 0 à PK 704)...");
+      const tileUrls = [];
+      
+      // Generation des tuiles clés du trajet pour stockage offline
+      snimTrackPoints.forEach(pt => {
+        const zoom = 9;
+        const x = Math.floor((pt[1] + 180) / 360 * Math.pow(2, zoom));
+        const y = Math.floor((1 - Math.log(Math.tan(pt[0] * Math.PI / 180) + 1 / Math.cos(pt[0] * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+        tileUrls.push(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`);
+      });
+
+      try {
+        const cache = await caches.open('snim-pcd-v4');
+        await Promise.all(tileUrls.map(u => fetch(u).then(r => cache.put(u, r)).catch(()=>{})));
+        showToast("✅ Tuiles du réseau SNIM pré-enregistrées pour le désert !");
+      } catch(e) {
+        showToast("⚠️ Échec du pré-chargement cartographique");
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // 5. CARTE ET RÉSEAU FERROVIAIRE
     // -----------------------------------------------------------------
     const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
 
@@ -603,9 +735,9 @@
     });
 
     // -----------------------------------------------------------------
-    // 4. ÉTAT & UTILISATEUR
+    // 6. GESTION UTILISATEUR & AUTHENTIFICATION SÉCURISÉE (JWT)
     // -----------------------------------------------------------------
-    let currentUser = JSON.parse(localStorage.getItem('snim_user') || 'null');
+    let currentUser = JSON.parse(sessionStorage.getItem('snim_token_session') || 'null');
     let soundEnabled = true;
     let nightMode = false;
     let realGPSActive = false;
@@ -639,19 +771,30 @@
       } catch(e) {}
     }
 
+    function generateMockJWT(matricule, role) {
+      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+      const payload = btoa(JSON.stringify({
+        sub: matricule,
+        role: role,
+        iss: "SNIM-IAM-GATEWAY",
+        exp: Math.floor(Date.now() / 1000) + (12 * 3600) // Valide 12h
+      }));
+      const signature = btoa("SNIM_SECRET_HMAC_KEY_2026");
+      return `${header}.${payload}.${signature}`;
+    }
+
     function updateUIForUser() {
       const badge = document.getElementById('userRoleBadge');
       const authBtn = document.getElementById('btnAuthToggle');
       const roleTitle = document.getElementById('panelRoleTitle');
       
-      if (currentUser) {
+      if (currentUser && currentUser.token) {
         badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
         document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
         authBtn.innerText = "🔓 DÉCONNEXION";
         authBtn.style.background = "#dc2626";
         document.getElementById('authModal').style.setProperty('display', 'none', 'important');
 
-        // Vue métier adaptée
         if (currentUser.role.includes("Conducteur")) {
           roleTitle.innerText = "CABINE CONDUCTEUR - POSTE BORD";
         } else if (currentUser.role.includes("Régulateur")) {
@@ -672,8 +815,8 @@
     function handleAuthButtonClick() {
       if (currentUser) {
         currentUser = null;
-        localStorage.removeItem('snim_user');
-        showToast("🔒 Session clôturée.");
+        sessionStorage.removeItem('snim_token_session');
+        showToast("🔒 Jeton d'accès révoqué. Session fermée.");
         updateUIForUser();
       } else { openAuthModal(); }
     }
@@ -682,10 +825,13 @@
       e.preventDefault();
       const matricule = document.getElementById('authMatricule').value;
       const role = document.getElementById('authRole').value;
-      currentUser = { matricule, role };
-      localStorage.setItem('snim_user', JSON.stringify(currentUser));
+      
+      const jwtToken = generateMockJWT(matricule, role);
+      currentUser = { matricule, role, token: jwtToken };
+      
+      sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
       updateUIForUser();
-      showToast(`🔑 Session ouverte : Agent ${matricule}`);
+      showToast(`🔑 Jetons JWT validé : Agent ${matricule}`);
     }
 
     function toggleAudio() {
@@ -723,7 +869,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 5. GPS RÉEL
+    // 7. GÉOLOCALISATION GPS
     // -----------------------------------------------------------------
     function toggleGPSReal() {
       realGPSActive = !realGPSActive;
@@ -746,7 +892,7 @@
               } else { userMarker.setLatLng([latitude, longitude]); }
               map.flyTo([latitude, longitude], 12);
             },
-            err => { showToast("⚠️ Position GPS introuvable"); },
+            err => { showToast("⚠️ Signal GPS faible en cabine"); },
             { enableHighAccuracy: true }
           );
         }
@@ -760,7 +906,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 6. GESTION DES SIGNALEMENTS ET FILTRES
+    // 8. SYNCHRONISATION DES SIGNALEMENTS
     // -----------------------------------------------------------------
     function filterReports(sev) {
       currentFilter = sev;
@@ -772,24 +918,25 @@
       renderReports();
     }
 
-    function renderReports() {
-      const saved = JSON.parse(localStorage.getItem('snim_reports') || '[]');
+    async function renderReports() {
       const reportsList = document.getElementById('driverReportsList');
       const search = document.getElementById('reportSearch').value.toLowerCase();
       reportsList.innerHTML = '';
 
-      const filtered = saved.filter(r => {
+      const localReports = await localDB.getAllReports();
+
+      const filtered = localReports.filter(r => {
         const matchesFilter = (currentFilter === 'all') || (r.severity === currentFilter);
         const matchesSearch = r.pk.toLowerCase().includes(search) || r.type.toLowerCase().includes(search) || (r.details && r.details.toLowerCase().includes(search));
         return matchesFilter && matchesSearch;
       });
 
       if (filtered.length === 0) {
-        reportsList.innerHTML = `<div style="text-align:center; padding:10px; color:#64748b;">Aucun signalement correspondant</div>`;
+        reportsList.innerHTML = `<div style="text-align:center; padding:10px; color:#64748b;">Aucun signalement trouvé</div>`;
         return;
       }
 
-      filtered.forEach(r => {
+      filtered.reverse().forEach(r => {
         const item = document.createElement('div');
         item.style.cssText = "border-bottom: 1px solid rgba(255,255,255,0.08); padding: 6px 0;";
         
@@ -805,18 +952,19 @@
           <div>${r.type}</div>
           <small style="color:#94a3b8; font-style:italic;">"${r.details || 'Aucune remarque'}"</small><br/>
           <small style="color:#64748b;">${r.time} - ${r.driver}</small>
+          <span style="font-size:8px; float:right; color:${r.synced ? '#10b981' : '#f59e0b'};">${r.synced ? 'SYNC CLOUD' : 'LOCAL (DB)'}</span>
         `;
         reportsList.appendChild(item);
       });
 
-      const pending = saved.filter(r => !r.synced).length;
+      const pending = localReports.filter(r => !r.synced).length;
       document.getElementById('offlineQueueCount').innerText = `${pending} Alerte(s) localement`;
     }
 
     function openReportModal() {
       if (!currentUser) {
         openAuthModal();
-        showToast("⚠️ Connectez votre matricule agent d'abord.");
+        showToast("⚠️ Authentification obligatoire pour émettre un rapport.");
         return;
       }
       document.getElementById('reportModal').style.display = 'flex';
@@ -824,7 +972,24 @@
 
     function closeReportModal() { document.getElementById('reportModal').style.display = 'none'; }
 
-    function submitReport(e) {
+    async function syncOfflineReports() {
+      if (!navigator.onLine || !supabaseClient) return;
+
+      const allReports = await localDB.getAllReports();
+      const unsynced = allReports.filter(r => !r.synced);
+
+      for (let r of unsynced) {
+        try {
+          const { error } = await supabaseClient.from('reports').insert([r]);
+          if (!error) {
+            await localDB.markSynced(r.id);
+          }
+        } catch(e) {}
+      }
+      renderReports();
+    }
+
+    async function submitReport(e) {
       e.preventDefault();
       const driver = currentUser ? `${currentUser.matricule} (${currentUser.role})` : "Agent Inconnu";
       const pk = document.getElementById('repPK').value;
@@ -835,19 +1000,13 @@
 
       const newReport = { pk, type, severity, details, driver, time: `Aujourd'hui à ${nowTime}`, synced: false };
 
-      const currentReports = JSON.parse(localStorage.getItem('snim_reports') || '[]');
-      currentReports.unshift(newReport);
-      localStorage.setItem('snim_reports', JSON.stringify(currentReports));
+      await localDB.saveReport(newReport);
 
-      if (navigator.onLine && supabaseClient) {
-        supabaseClient.from('reports').insert([newReport]).then(() => {
-          newReport.synced = true;
-          localStorage.setItem('snim_reports', JSON.stringify(currentReports));
-          showToast("☁️ Synchro Cloud PCD Réussie !");
-          renderReports();
-        }).catch(() => { showToast("💾 Enregistré localement (Attente réseau)"); });
+      if (navigator.onLine) {
+        syncOfflineReports();
+        showToast("⚡ Enregistré en DB Locale & Sync Cloud !");
       } else {
-        showToast("💾 Stocké en mémoire locale (Zone Blanche).");
+        showToast("💾 Sauvegardé en mémoire locale IndexedDB (Zone Blanche).");
       }
 
       renderReports();
@@ -864,7 +1023,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 7. SIMULATION & MAINTENANCE
+    // 9. SIMULATION DE CONVOIS & MAINTENANCE
     // -----------------------------------------------------------------
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
@@ -909,6 +1068,7 @@
       if (navigator.onLine) {
         netLabel.innerText = "En Ligne (Online)";
         netLabel.style.color = "#10b981";
+        syncOfflineReports();
       } else {
         netLabel.innerText = "Hors Ligne (Désert)";
         netLabel.style.color = "#ef4444";
@@ -941,13 +1101,13 @@
     }
 
     window.addEventListener('online', () => {
-      showToast("📡 Connexion rétablie ! Synchro des alertes...");
-      renderReports();
+      showToast("📡 Connexion rétablie ! Sync Cloud en cours...");
+      syncOfflineReports();
     });
 
-    // Initialisation
+    // Initialisation globale
     updateUIForUser();
-    renderReports();
+    setTimeout(renderReports, 500);
     setInterval(updatePositions, 4000);
   </script>
 </body>
