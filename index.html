@@ -152,6 +152,7 @@
     .btn-report { background: #dc2626 !important; border-color: #f87171 !important; flex: 1.2; }
     .btn-dispatch { background: #7c3aed !important; flex: 1.2; }
     .btn-menu-toggle { background: #1e293b; border-color: #f59e0b; color: #f59e0b; flex: 0.8; }
+    .btn-gps-highlight { background: #10b981 !important; border-color: #34d399 !important; color: #000 !important; font-weight: bold; }
 
     /* MENU DE REPLIAGE SECONDAIRE (MOBILE) */
     .controls-secondary {
@@ -405,6 +406,19 @@
     .sev-medium { background: #d97706; color: white; }
     .sev-info { background: #0284c7; color: white; }
 
+    /* PULSE VERT POUR LES CHANTIERS SNIM */
+    .snim-site-label {
+      background: rgba(0, 255, 102, 0.15);
+      border: 2px solid #00ff66;
+      color: #00ff66;
+      font-weight: bold;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.6);
+      white-space: nowrap;
+    }
+
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   </style>
 </head>
@@ -432,13 +446,13 @@
       <button class="btn btn-menu-toggle" onclick="toggleSecondaryMenu()">⚙️ MENU</button>
     </div>
 
-    <!-- Actions Secondaires (Repiées dans le sous-menu sur Mobile) -->
+    <!-- Actions Secondaires -->
     <div class="controls-secondary" id="secondaryMenu">
+      <button class="btn btn-gps-highlight" id="btnGPSReal" onclick="toggleGPSReal()">🛰️ GPS RÉEL</button>
       <button class="btn" id="btnDownloadMap" onclick="preloadOfflineLine()">📥 CACHE MAP</button>
       <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
       <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
       <button class="btn" id="btnHeatmap" onclick="toggleHeatmap()">🛠️ MAINTENANCE</button>
-      <button class="btn" id="btnGPSReal" onclick="toggleGPSReal()">🛰️ GPS RÉEL</button>
       <button class="btn" id="btnAuthToggle" onclick="handleAuthButtonClick()">🔑 AGENT</button>
     </div>
   </div>
@@ -703,7 +717,7 @@
     const securityManager = new SecurityManager();
 
     // -----------------------------------------------------------------
-    // 1. MOTEUR PERSISTANCE INDEXEDDB (OFFLINE-FIRST ENTERPRISE)
+    // 1. MOTEUR PERSISTANCE INDEXEDDB
     // -----------------------------------------------------------------
     class LocalDB {
       constructor() {
@@ -783,7 +797,7 @@
     localDB.init().catch(() => console.warn("IndexedDB non supporté"));
 
     // -----------------------------------------------------------------
-    // 2. ARBITRAGE RESEAU HYBRIDE, FAILOVER AUTOMATIQUE & REFRESH JWT
+    // 2. ARBITRAGE RESEAU HYBRIDE & REFRESH JWT
     // -----------------------------------------------------------------
     class FailoverJWTManager {
       constructor() {
@@ -964,7 +978,7 @@
     // -----------------------------------------------------------------
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE_NAME = 'snim-pcd-v6-enterprise';
+        const CACHE_NAME = 'snim-pcd-v7-enterprise';
         const STATIC_ASSETS = [
           './',
           'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -1009,7 +1023,7 @@
       });
 
       try {
-        const cache = await caches.open('snim-pcd-v6-enterprise');
+        const cache = await caches.open('snim-pcd-v7-enterprise');
         await Promise.all(tileUrls.map(u => fetch(u).then(r => cache.put(u, r)).catch(()=>{})));
         showToast("✅ Tuiles du réseau SNIM pré-enregistrées !");
       } catch(e) {
@@ -1018,7 +1032,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 8. CARTE & TRAÇÉ SNIM
+    // 8. CARTE & TRAÇÉ SNIM & CHANTIERS SNIM (VERT VIF)
     // -----------------------------------------------------------------
     const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
 
@@ -1046,6 +1060,45 @@
       L.marker(pk.coords, { icon: icon }).addTo(map);
     });
 
+    // 🏗️ CHANTIERS, GARE & INFRASTRUCTURES SNIM (CERCLES VERT VIF)
+    const snimSites = [
+      { name: "Chantier Port Minéralier & Ateliers Cansado (PK 0)", coords: [20.9322, -17.0342], radius: 6000, desc: "Zone de déchargement des wagons, basculeurs & ateliers de maintenance lourde." },
+      { name: "Chantier & Évitement de Ben Amira (PK 200)", coords: [21.0000, -16.2000], radius: 4500, desc: "Point de croisement convois & station maintenance voies." },
+      { name: "Chantier & Postes Voies de Choum (PK 460)", coords: [21.3000, -13.0000], radius: 5000, desc: "Passe de Choum - Zone d'ensablement prioritaire & maintenance réseau." },
+      { name: "Chantier Extractif & Gare F'Dérik (PK 650)", coords: [22.6800, -12.7000], radius: 5500, desc: "Ateliers de tri du minerai & entretien des rames minéralières." },
+      { name: "Chantier Mine de Kedia d'Idjil / Zouérate (PK 704)", coords: [22.7441, -12.4789], radius: 8000, desc: "Site de chargement principal du minerai de fer & régulation centrale Nord." },
+      { name: "Chantier Usine & Mine du Guelb El Rhein", coords: [22.9500, -12.5300], radius: 7000, desc: "Complexe usine d'enrichissement de magnétite SNIM." }
+    ];
+
+    snimSites.forEach(site => {
+      // Cercle vert vif sur la carte
+      const circle = L.circle(site.coords, {
+        color: '#00ff66',
+        fillColor: '#00ff66',
+        fillOpacity: 0.25,
+        weight: 3,
+        dashArray: '5, 5'
+      }).addTo(map);
+
+      // Marker personnalisé vert vif
+      const siteIcon = L.divIcon({
+        className: 'snim-site-marker',
+        html: `<div class="snim-site-label">🏗️ ${site.name}</div>`,
+        iconAnchor: [40, 10]
+      });
+
+      L.marker(site.coords, { icon: siteIcon }).addTo(map);
+
+      circle.bindPopup(`
+        <div style="font-size:12px; color:#0f172a;">
+          <b style="color:#059669;">🏗️ CHANTIER FERROVIAIRE SNIM</b><br/>
+          <strong>Nom :</strong> ${site.name}<br/>
+          <strong>Activité :</strong> ${site.desc}<br/>
+          <small style="color:#10b981;">Zone sécurisée sous cercle vert vif (${site.radius/1000} km)</small>
+        </div>
+      `);
+    });
+
     // -----------------------------------------------------------------
     // 9. AUTHENTIFICATION & UTILISATEUR
     // -----------------------------------------------------------------
@@ -1055,6 +1108,7 @@
     let realGPSActive = false;
     let gpsWatchId = null;
     let userMarker = null;
+    let userAccuracyCircle = null;
     let heatmapActive = false;
     let audioContext = null;
     let maintenanceLayers = [];
@@ -1212,7 +1266,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 11. GÉOLOCALISATION GPS CORRIGÉE
+    // 11. GÉOLOCALISATION GPS ET RECENTRAGE PRÉCIS
     // -----------------------------------------------------------------
     function toggleGPSReal() {
       realGPSActive = !realGPSActive;
@@ -1220,42 +1274,53 @@
 
       if (realGPSActive) {
         btn.classList.add('btn-active');
-        if (navigator.geolocation) {
-          showToast("🛰️ Recherche du signal GPS...");
+        if ('geolocation' in navigator) {
+          showToast("🛰️ Recherche du signal GPS haute précision...");
           gpsWatchId = navigator.geolocation.watchPosition(
             pos => {
-              const { latitude, longitude } = pos.coords;
-              updateGPSMarker(latitude, longitude, "<b>Votre position GPS Réelle</b>");
-              showToast("📍 Position GPS synchronisée");
+              const { latitude, longitude, accuracy } = pos.coords;
+              updateGPSMarker(latitude, longitude, accuracy, "<b>📍 Votre Position Exacte Terrain</b>");
             },
             err => {
-              // Fallback Réseau Isolés / Signal faible : Simulation point terrain ferroviaire
-              showToast("⚠️ GPS Réel indisponible : Basculement GPS Terrain (PK 460)");
-              const simulatedCoords = [21.3000, -13.0000]; // PK 460 Choum
-              updateGPSMarker(simulatedCoords[0], simulatedCoords[1], "<b>Position GPS Simulée (PK 460 - Choum)</b>");
+              showToast("⚠️ Signal GPS satellite inaccessible. Activation du GPS de secours (PK 460)");
+              const simulatedCoords = [21.3000, -13.0000]; // Fallback PK 460 Choum
+              updateGPSMarker(simulatedCoords[0], simulatedCoords[1], 50, "<b>Position Simulée (PK 460 - Choum)</b>");
             },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
           );
         } else {
-          showToast("⚠️ Géolocalisation non supportée");
+          showToast("⚠️ La géolocalisation n'est pas supportée par cet appareil");
         }
       } else {
         btn.classList.remove('btn-active');
         if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
         if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+        if (userAccuracyCircle) { map.removeLayer(userAccuracyCircle); userAccuracyCircle = null; }
         showToast("🛰️ GPS Désactivé");
       }
     }
 
-    function updateGPSMarker(lat, lng, popupContent) {
+    function updateGPSMarker(lat, lng, accuracy, popupContent) {
       if (!userMarker) {
         userMarker = L.marker([lat, lng], {
-          icon: L.divIcon({ html: '<div style="font-size:24px;">📡</div>', className: 'train-icon', iconSize: [30,30] })
+          icon: L.divIcon({ html: '<div style="font-size:26px; filter: drop-shadow(0px 0px 5px #38bdf8);">🎯</div>', className: 'train-icon', iconSize: [32,32] })
         }).addTo(map).bindPopup(popupContent);
+        
+        userAccuracyCircle = L.circle([lat, lng], {
+          radius: accuracy || 30,
+          color: '#38bdf8',
+          fillColor: '#38bdf8',
+          fillOpacity: 0.15
+        }).addTo(map);
       } else { 
         userMarker.setLatLng([lat, lng]);
+        userAccuracyCircle.setLatLng([lat, lng]);
+        if(accuracy) userAccuracyCircle.setRadius(accuracy);
       }
-      map.flyTo([lat, lng], 11);
+      
+      // RECENTRAGE DE LA CARTE
+      map.flyTo([lat, lng], 14, { animate: true, duration: 1.5 });
+      showToast(`🎯 Position fixée à ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     }
 
     // -----------------------------------------------------------------
