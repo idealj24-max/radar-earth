@@ -38,11 +38,18 @@
 
     .leaflet-control-attribution { display: none !important; }
 
+    /* Correction des carrés noirs Leaflet */
+    .leaflet-div-icon, .train-icon {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
     .night-mode {
       filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(120%);
     }
 
-    /* BANDEAU SUPÉRIEUR */
+    /* BANDEAU SUPÉRIEUR MOBILE-OPTIMIZED */
     .top-panel {
       position: absolute;
       top: 10px;
@@ -52,15 +59,20 @@
       background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(245, 158, 11, 0.5);
-      padding: 10px 12px;
+      padding: 8px 12px;
       border-radius: 12px;
       color: white;
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
       gap: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+    }
+
+    .top-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
     }
 
     .top-panel.alert-active {
@@ -75,10 +87,10 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-weight: bold;
       color: #f59e0b;
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .pulse {
@@ -96,7 +108,11 @@
       color: #38bdf8;
       padding: 2px 6px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 9px;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .net-badge {
@@ -105,32 +121,50 @@
       color: #10b981;
       padding: 2px 6px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: bold;
     }
 
-    .controls {
+    .controls-main {
       display: flex;
       gap: 6px;
-      flex-wrap: wrap;
+      width: 100%;
+      align-items: center;
     }
 
     .btn {
       background: #334155;
       border: 1px solid rgba(255,255,255,0.2);
       color: white;
-      padding: 6px 10px;
+      padding: 8px 10px;
       border-radius: 6px;
       font-weight: 600;
       font-size: 11px;
       cursor: pointer;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 4px;
+      touch-action: manipulation;
     }
 
     .btn-active { background: #d97706 !important; }
-    .btn-report { background: #dc2626 !important; border-color: #f87171 !important; }
+    .btn-report { background: #dc2626 !important; border-color: #f87171 !important; flex: 1.2; }
+    .btn-dispatch { background: #7c3aed !important; flex: 1.2; }
+    .btn-menu-toggle { background: #1e293b; border-color: #f59e0b; color: #f59e0b; flex: 0.8; }
+
+    /* MENU DE REPLIAGE SECONDAIRE (MOBILE) */
+    .controls-secondary {
+      display: none;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(255,255,255,0.15);
+    }
+
+    .controls-secondary.open {
+      display: grid;
+    }
 
     /* PANNEAU LATÉRAL */
     .side-panel {
@@ -138,7 +172,8 @@
       bottom: 25px;
       left: 10px;
       z-index: 1000;
-      width: 330px;
+      width: calc(100% - 20px);
+      max-width: 340px;
       background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(56, 189, 248, 0.4);
@@ -147,33 +182,30 @@
       padding: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.8);
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 72vh;
+      max-height: 55vh;
       overflow-y: auto;
     }
 
-    .side-panel.collapsed { transform: translateX(-350px); }
+    .side-panel.collapsed { transform: translateY(120%); }
 
     .side-toggle-btn {
       position: fixed;
-      left: 10px;
+      right: 15px;
       bottom: 25px;
       z-index: 1001;
       background: #0f172a;
       border: 1px solid rgba(56, 189, 248, 0.6);
       color: white;
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.8);
-      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
-    .side-panel:not(.collapsed) + .side-toggle-btn { left: 350px; }
 
     .panel-tabs {
       display: flex;
@@ -188,7 +220,7 @@
       background: #1e293b;
       border: none;
       color: #94a3b8;
-      padding: 6px;
+      padding: 8px;
       font-size: 10px;
       font-weight: bold;
       border-radius: 4px;
@@ -198,13 +230,13 @@
     .tab-btn.active { background: #0284c7; color: white; }
 
     .telemetry-section {
-      margin-top: 10px;
+      margin-top: 8px;
       padding-top: 6px;
       border-top: 1px dashed rgba(255,255,255,0.2);
     }
 
     .telemetry-title {
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
       color: #f59e0b;
       margin-bottom: 4px;
@@ -245,7 +277,6 @@
       padding: 15px;
     }
 
-    /* Correction d'affichage dynamique via la classe .active-modal */
     .modal-overlay.active-modal {
       display: flex !important;
     }
@@ -262,7 +293,7 @@
     }
 
     .modal-title {
-      font-size: 14px;
+      font-size: 13px;
       color: #f59e0b;
       font-weight: bold;
       display: flex;
@@ -312,22 +343,27 @@
       cursor: pointer;
     }
 
+    /* REPOSITIONNEMENT DU TOAST EN BAS SUR MOBILE */
     .toast-notification {
       position: fixed;
-      top: 75px;
+      bottom: 80px !important;
+      top: auto !important;
       left: 50%;
-      transform: translateX(-50%) translateY(-20px);
+      transform: translateX(-50%) translateY(20px);
       background: #10b981;
       color: white;
       padding: 10px 16px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: bold;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
       z-index: 3000;
       opacity: 0;
       pointer-events: none;
       transition: all 0.3s ease;
+      width: 90%;
+      max-width: 350px;
+      text-align: center;
     }
 
     .toast-notification.show {
@@ -376,18 +412,29 @@
 
   <div class="toast-notification" id="toast">✅ Notification Système SNIM</div>
 
-  <!-- BANDEAU HAUT -->
+  <!-- BANDEAU HAUT OPTIMISÉ -->
   <div class="top-panel" id="topPanel">
-    <div class="brand">
-      <div class="pulse"></div>
-      <span id="panelTitle">PCD 2.0 SNIM</span>
-      <span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
-      <span class="net-badge" id="hybridNetBadge">🌐 4G LTE</span>
+    <div class="top-header-row">
+      <div class="brand">
+        <div class="pulse"></div>
+        <span id="panelTitle">PCD 2.0 SNIM</span>
+      </div>
+      <div style="display:flex; gap:4px; align-items:center;">
+        <span class="user-badge" id="userRoleBadge">NON CONNECTÉ</span>
+        <span class="net-badge" id="hybridNetBadge">🌐 4G LTE</span>
+      </div>
     </div>
-    <div class="controls">
+
+    <!-- Actions Principales (Toujours Visibles) -->
+    <div class="controls-main">
       <button class="btn btn-report" onclick="openReportModal()">📝 ANOMALIE</button>
-      <button class="btn" id="btnSimulateDispatch" onclick="simulateDispatchOrder()" style="background:#7c3aed;">📡 TEST RÉGULATION</button>
-      <button class="btn" id="btnDownloadMap" onclick="preloadOfflineLine()">📥 CACHE MAP SNIM</button>
+      <button class="btn btn-dispatch" id="btnSimulateDispatch" onclick="simulateDispatchOrder()">📡 RÉGULATION</button>
+      <button class="btn btn-menu-toggle" onclick="toggleSecondaryMenu()">⚙️ MENU</button>
+    </div>
+
+    <!-- Actions Secondaires (Repiées dans le sous-menu sur Mobile) -->
+    <div class="controls-secondary" id="secondaryMenu">
+      <button class="btn" id="btnDownloadMap" onclick="preloadOfflineLine()">📥 CACHE MAP</button>
       <button class="btn" id="btnAudio" onclick="toggleAudio()">🔊 SON : ON</button>
       <button class="btn" id="btnNight" onclick="toggleNightMode()">🌙 NUIT</button>
       <button class="btn" id="btnHeatmap" onclick="toggleHeatmap()">🛠️ MAINTENANCE</button>
@@ -405,7 +452,7 @@
     
     <!-- VUE 1 : TEMPS RÉEL -->
     <div id="tabLive">
-      <h4 style="color:#f59e0b; font-size:12px; margin-bottom:8px;" id="panelRoleTitle">POSTE DE COMMANDEMENT SNIM</h4>
+      <h4 style="color:#f59e0b; font-size:11px; margin-bottom:6px;" id="panelRoleTitle">POSTE DE COMMANDEMENT SNIM</h4>
       
       <div class="telemetry-section">
         <div class="telemetry-title">🚂 BUS CAN (J1939) & CAPTEURS IoT</div>
@@ -439,7 +486,7 @@
 
     <!-- VUE 2 : ANALYTICS & HISTORIQUE INCIDENTS -->
     <div id="tabStats" style="display: none;">
-      <h4 style="color:#38bdf8; font-size:12px; margin-bottom:8px;">HISTORIQUE SYNCHRONISÉ (CLOUD/LOCAL)</h4>
+      <h4 style="color:#38bdf8; font-size:11px; margin-bottom:6px;">HISTORIQUE SYNCHRONISÉ (CLOUD/LOCAL)</h4>
 
       <div class="telemetry-section">
         <div class="telemetry-title">⚠️ REPARTITION DES ALERTES</div>
@@ -472,7 +519,7 @@
 
         <input type="text" id="reportSearch" placeholder="🔍 Filtrer par PK ou mot-clé..." onkeyup="renderReports()" style="width:100%; background:#1e293b; border:1px solid #334155; color:white; padding:5px; border-radius:4px; font-size:10px; margin-bottom:8px;">
 
-        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1; max-height: 200px; overflow-y: auto;"></div>
+        <div id="driverReportsList" style="font-size: 10px; color: #cbd5e1; max-height: 180px; overflow-y: auto;"></div>
       </div>
     </div>
 
@@ -636,7 +683,10 @@
       }
 
       async decryptData(encryptedObject) {
-        if (!encryptedObject.isEncrypted || !this.sessionKey) return encryptedObject;
+        if (!encryptedObject.isEncrypted) return encryptedObject;
+        if (!this.sessionKey) {
+          return { ...encryptedObject, type: "DONNÉES CHIFFRÉES SÉCURISÉES", pk: encryptedObject.pk || "Inconnu", severity: "INFO" };
+        }
         try {
           const decryptedContent = await crypto.subtle.decrypt(
             { name: "AES-GCM", iv: new Uint8Array(encryptedObject.iv) },
@@ -645,8 +695,7 @@
           );
           return JSON.parse(new TextDecoder().decode(decryptedContent));
         } catch(e) {
-          console.error("Déchiffrement impossible", e);
-          return { type: "DONNÉES CHIFFRÉES SÉCURISÉES", pk: encryptedObject.pk || "Inconnu", severity: "INFO" };
+          return { ...encryptedObject, type: "DONNÉES CHIFFRÉES SÉCURISÉES", pk: encryptedObject.pk || "Inconnu", severity: "INFO" };
         }
       }
     }
@@ -1018,6 +1067,11 @@
       if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
+    function toggleSecondaryMenu() {
+      const menu = document.getElementById('secondaryMenu');
+      menu.classList.toggle('open');
+    }
+
     function playAlertSound() {
       if (!soundEnabled) return;
       try {
@@ -1053,14 +1107,12 @@
       const authModal = document.getElementById('authModal');
       
       if (currentUser && currentUser.token) {
-        badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
+        badge.innerText = `${currentUser.matricule}`;
         document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
         authBtn.innerText = "🔓 DÉCONNEXION";
         authBtn.style.background = "#dc2626";
         
-        // Fermeture de la modale d'authentification
         authModal.classList.remove('active-modal');
-
         await securityManager.initSessionKey(currentUser.token);
 
         if (currentUser.role.includes("Conducteur")) {
@@ -1074,10 +1126,9 @@
         badge.innerText = "NON CONNECTÉ";
         authBtn.innerText = "🔑 AGENT";
         authBtn.style.background = "#334155";
-        
-        // Ouverture forcée de la modale si non connecté
         authModal.classList.add('active-modal');
       }
+      renderReports();
     }
 
     function openAuthModal() { 
@@ -1161,7 +1212,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 11. GÉOLOCALISATION GPS
+    // 11. GÉOLOCALISATION GPS CORRIGÉE
     // -----------------------------------------------------------------
     function toggleGPSReal() {
       realGPSActive = !realGPSActive;
@@ -1170,25 +1221,41 @@
       if (realGPSActive) {
         btn.classList.add('btn-active');
         if (navigator.geolocation) {
+          showToast("🛰️ Recherche du signal GPS...");
           gpsWatchId = navigator.geolocation.watchPosition(
             pos => {
               const { latitude, longitude } = pos.coords;
-              if (!userMarker) {
-                userMarker = L.marker([latitude, longitude], {
-                  icon: L.divIcon({ html: '🛰️', className: 'train-icon', iconSize: [28,28] })
-                }).addTo(map).bindPopup("<b>Votre position GPS en temps réel</b>");
-              } else { userMarker.setLatLng([latitude, longitude]); }
-              map.flyTo([latitude, longitude], 12);
+              updateGPSMarker(latitude, longitude, "<b>Votre position GPS Réelle</b>");
+              showToast("📍 Position GPS synchronisée");
             },
-            err => { showToast("⚠️ Signal GPS faible"); },
-            { enableHighAccuracy: true }
+            err => {
+              // Fallback Réseau Isolés / Signal faible : Simulation point terrain ferroviaire
+              showToast("⚠️ GPS Réel indisponible : Basculement GPS Terrain (PK 460)");
+              const simulatedCoords = [21.3000, -13.0000]; // PK 460 Choum
+              updateGPSMarker(simulatedCoords[0], simulatedCoords[1], "<b>Position GPS Simulée (PK 460 - Choum)</b>");
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
           );
+        } else {
+          showToast("⚠️ Géolocalisation non supportée");
         }
       } else {
         btn.classList.remove('btn-active');
         if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
         if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+        showToast("🛰️ GPS Désactivé");
       }
+    }
+
+    function updateGPSMarker(lat, lng, popupContent) {
+      if (!userMarker) {
+        userMarker = L.marker([lat, lng], {
+          icon: L.divIcon({ html: '<div style="font-size:24px;">📡</div>', className: 'train-icon', iconSize: [30,30] })
+        }).addTo(map).bindPopup(popupContent);
+      } else { 
+        userMarker.setLatLng([lat, lng]);
+      }
+      map.flyTo([lat, lng], 11);
     }
 
     // -----------------------------------------------------------------
@@ -1206,7 +1273,9 @@
 
     async function renderReports() {
       const reportsList = document.getElementById('driverReportsList');
-      const search = document.getElementById('reportSearch').value.toLowerCase();
+      if (!reportsList) return;
+      const searchInput = document.getElementById('reportSearch');
+      const search = searchInput ? searchInput.value.toLowerCase() : '';
       reportsList.innerHTML = '';
 
       const localReports = await localDB.getAllReports();
@@ -1237,7 +1306,7 @@
             <b style="color:#f59e0b;">${r.pk || 'PK Inconnu'}</b>
             <span class="badge-severity ${sevClass}">${r.severity || 'INFO'}</span>
           </div>
-          <div>${r.type || 'Anomalie'}</div>
+          <div style="font-weight:600; color:#e2e8f0;">${r.type || 'Anomalie'}</div>
           <small style="color:#94a3b8; font-style:italic;">"${r.details || 'Aucune remarque'}"</small><br/>
           <small style="color:#64748b;">${r.time || 'Aujourd\'hui'} - ${r.driver || 'Agent'}</small>
           <span style="font-size:8px; float:right; color:${r.synced ? '#10b981' : '#f59e0b'};">${r.synced ? 'SYNC CLOUD' : 'LOCAL (AES-256)'}</span>
@@ -1341,7 +1410,9 @@
     ];
 
     trains.forEach(t => {
-      t.marker = L.marker(t.position, { icon: L.divIcon({ html: `<div class="train-icon">🚂</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(map);
+      t.marker = L.marker(t.position, { 
+        icon: L.divIcon({ html: `<div style="font-size:22px; line-height:1;">🚂</div>`, className: 'train-icon', iconSize: [28, 28], iconAnchor: [14, 14] }) 
+      }).addTo(map);
       t.safetyCircle = L.circle(t.position, { radius: 2000, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.15, dashArray: '4, 6' }).addTo(map);
     });
 
@@ -1390,7 +1461,6 @@
 
     // Initialisation globale
     updateUIForUser();
-    setTimeout(renderReports, 500);
     setInterval(updatePositions, 4000);
   </script>
 </body>
