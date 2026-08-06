@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PCD 2.0 SNIM - Industrial Command Center</title>
   
-  <!-- Configurations PWA Mobile & Standalone Native -->
+  <!-- PWA & Standalone Mobile -->
   <link rel="manifest" href="data:application/manifest+json,&#123;&quot;name&quot;:&quot;SNIM PCD Command Center&quot;,&quot;short_name&quot;:&quot;PCD SNIM&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#090d16&quot;,&quot;theme_color&quot;:&quot;#0f172a&quot;,&quot;orientation&quot;:&quot;any&quot;&#125;">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- Client Backend Supabase & MQTT WebSocket -->
+  <!-- Backend Supabase & MQTT WebSocket -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
@@ -245,7 +245,10 @@
       padding: 15px;
     }
 
-    #authModal { display: flex !important; z-index: 99999 !important; }
+    /* Correction d'affichage dynamique via la classe .active-modal */
+    .modal-overlay.active-modal {
+      display: flex !important;
+    }
 
     .modal-card {
       background: #0f172a;
@@ -478,7 +481,7 @@
   <button class="side-toggle-btn" id="sideToggleBtn" onclick="toggleSidePanel()">📊</button>
 
   <!-- MODAL 1: AUTHENTIFICATION SÉCURISÉE JWT / SNIM IAM -->
-  <div class="modal-overlay" id="authModal">
+  <div class="modal-overlay active-modal" id="authModal">
     <div class="modal-card">
       <div class="modal-title">🔐 AUTHENTIFICATION SÉCURISÉE SNIM IAM</div>
       <form onsubmit="handleAuth(event)">
@@ -559,7 +562,7 @@
     </div>
   </div>
 
-  <!-- MODAL 3: ORDRE DE REGULATION INTERACTIF (NOUADHIBOU / ZOUÉRATE DISPATCH) -->
+  <!-- MODAL 3: ORDRE DE REGULATION INTERACTIF -->
   <div class="modal-overlay" id="dispatchModal">
     <div class="modal-card" style="border-color:#a855f7; max-width:450px;">
       <div class="modal-title" style="color:#c084fc;">📡 ORDRE DU POSTE CENTRAL DE RÉGULATION</div>
@@ -584,7 +587,7 @@
     // -----------------------------------------------------------------
     class SecurityManager {
       constructor() {
-        this.sessionKey = null; // Stocké en RAM uniquement
+        this.sessionKey = null;
       }
 
       async initSessionKey(userToken) {
@@ -617,7 +620,7 @@
       }
 
       async encryptData(dataObject) {
-        if (!this.sessionKey) return dataObject; // Repli non chiffré si session inactive
+        if (!this.sessionKey) return dataObject;
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const encodedData = new TextEncoder().encode(JSON.stringify(dataObject));
         const encryptedContent = await crypto.subtle.encrypt(
@@ -672,7 +675,7 @@
             this.db = e.target.result;
             resolve();
           };
-          req.onerror = (e) => reject("Erreur d'initialisation IndexedDB");
+          req.onerror = () => reject("Erreur d'initialisation IndexedDB");
         });
       }
 
@@ -767,7 +770,6 @@
       }
 
       startSilentRefreshLoop() {
-        // Rafraîchissement automatique des jetons toutes les 15 minutes sans déconnexion utilisateur
         this.refreshTimer = setInterval(() => {
           if (currentUser && this.isOnline4G) {
             this.refreshJWTToken();
@@ -781,7 +783,6 @@
           currentUser.token = generateMockJWT(currentUser.matricule, currentUser.role);
           sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
           document.getElementById('jwtStatus').innerText = "Valide (Auto-Refreshed)";
-          console.log("🔒 Jeton JWT rafraîchi silencieusement en arrière-plan.");
         } catch(e) {
           document.getElementById('jwtStatus').innerText = "Mode Hors-Ligne (Dernier Jeton)";
         }
@@ -789,18 +790,10 @@
 
       async transmit(report) {
         if (this.isOnline4G && supabaseClient) {
-          console.log("🌐 Transmission via HTTP/4G LTE...");
           const { error } = await supabaseClient.from('reports').insert([report]);
           return !error;
         } else {
-          console.warn("📡 Réseau Cellular indisponible. Envoi micro-trame binaire via Passerelle Satellite/LoRaWAN Cabine...");
-          const compactPayload = {
-            pk: report.pk,
-            sev: report.severity === "CRITIQUE" ? 0x01 : 0x02,
-            ts: Math.floor(Date.now() / 1000)
-          };
-          console.log("📟 Trame LoRaWAN / Iridium transmise au boîtier local :", compactPayload);
-          return false; // Conservé en DB locale pour synchro HTTP ultérieure
+          return false;
         }
       }
     }
@@ -808,22 +801,18 @@
     const networkManager = new FailoverJWTManager();
 
     // -----------------------------------------------------------------
-    // 3. INGESTION RÉELLE IoT (MQTT OVER WEBSOCKET) + FALLBACK SIMULATION
+    // 3. INGESTION IoT (MQTT OVER WEBSOCKET)
     // -----------------------------------------------------------------
     class MQTTBrokerBridge {
       constructor() {
         this.client = null;
         this.isConnected = false;
-        // URL exemple d'un broker industriel LoRaWAN / Bus CAN
         this.brokerUrl = "wss://broker.hivemq.com:8000/mqtt";
         this.initMQTT();
       }
 
       initMQTT() {
-        if (typeof mqtt === "undefined") {
-          console.warn("Librairie MQTT non chargée, basculement en mode simulation.");
-          return;
-        }
+        if (typeof mqtt === "undefined") return;
         
         try {
           this.client = mqtt.connect(this.brokerUrl, {
@@ -856,9 +845,7 @@
             document.getElementById('tIotSource').innerText = "SIMULÉ (Fallback Network)";
             document.getElementById('tIotSource').style.color = "#a855f7";
           });
-        } catch(e) {
-          console.warn("Impossible de se connecter au Broker MQTT physique, mode simulé activé.");
-        }
+        } catch(e) {}
       }
 
       handleTelemetryIngestion(data) {
@@ -877,7 +864,7 @@
     const mqttBridge = new MQTTBrokerBridge();
 
     // -----------------------------------------------------------------
-    // 4. ARBITRAGE MULTI-AGENTS ET RÉSOLUTION DE CONFLITS (CRDT / QUEUE)
+    // 4. RÉSOLUTEUR DE CONFLITS (CRDT)
     // -----------------------------------------------------------------
     class ConflictResolutionEngine {
       constructor() {
@@ -886,29 +873,23 @@
       }
 
       processIncomingOrder(newOrder) {
-        // Validation horodatage logique (Vector Clock / LWW-Element-Set CRDT)
         const sectorKey = newOrder.sector;
         const existingOrder = this.processedVectorClocks.get(sectorKey);
 
-        if (existingOrder) {
-          if (newOrder.timestamp <= existingOrder.timestamp) {
-            console.warn("⚠️ [CRDT Resolution] Ordre obsolète rejeté pour le secteur", sectorKey);
-            return false;
-          }
+        if (existingOrder && newOrder.timestamp <= existingOrder.timestamp) {
+          return false;
         }
 
-        // Enregistrement de l'ordre prioritaire
         this.processedVectorClocks.set(sectorKey, newOrder);
         this.orderQueue.push(newOrder);
 
-        // Affichage de l'ordre dans l'interface
         document.getElementById('dispOrigin').innerText = newOrder.origin || "Central PCD";
         document.getElementById('dispInstruction').innerText = newOrder.instruction;
         document.getElementById('dispSector').innerText = newOrder.sector;
         document.getElementById('dispSpeed').innerText = newOrder.speed;
         document.getElementById('dispTimestamp').innerText = new Date(newOrder.timestamp).toLocaleTimeString();
         
-        document.getElementById('dispatchModal').style.display = 'flex';
+        document.getElementById('dispatchModal').classList.add('active-modal');
         playAlertSound();
         return true;
       }
@@ -917,7 +898,7 @@
     const conflictResolver = new ConflictResolutionEngine();
 
     // -----------------------------------------------------------------
-    // 5. BACKEND SUPABASE & POSTGIS SYNC
+    // 5. BACKEND SUPABASE
     // -----------------------------------------------------------------
     const SUPABASE_URL = "https://xyzcompany.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
@@ -927,10 +908,10 @@
       if (window.supabase) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       }
-    } catch(e) { console.warn("Mode Cloud déconnecté."); }
+    } catch(e) {}
 
     // -----------------------------------------------------------------
-    // 6. SERVICE WORKER PWA FULL OFF-LINE & MAP CACHING
+    // 6. SERVICE WORKER PWA
     // -----------------------------------------------------------------
     if ('serviceWorker' in navigator) {
       const swCode = `
@@ -956,23 +937,9 @@
         });
 
         self.addEventListener('fetch', e => {
-          const url = e.request.url;
-          if (url.includes('arcgisonline.com') || url.includes('basemaps.cartocdn.com') || url.includes('unpkg.com')) {
-            e.respondWith(
-              caches.match(e.request).then(cached => {
-                return cached || fetch(e.request).then(res => {
-                  return caches.open(CACHE_NAME).then(cache => {
-                    cache.put(e.request, res.clone());
-                    return res;
-                  });
-                });
-              })
-            );
-          } else {
-            e.respondWith(
-              caches.match(e.request).then(res => res || fetch(e.request).catch(() => caches.match('./')))
-            );
-          }
+          e.respondWith(
+            caches.match(e.request).then(res => res || fetch(e.request).catch(() => caches.match('./')))
+          );
         });
       `;
       const blob = new Blob([swCode], { type: 'text/javascript' });
@@ -980,12 +947,11 @@
     }
 
     // -----------------------------------------------------------------
-    // 7. PRE-CHARGEMENT DES TUILES DE CARTE (NOUADHIBOU -> ZOUÉRATE)
+    // 7. PRE-CHARGEMENT TUILES CARTE (PK 0 -> PK 704)
     // -----------------------------------------------------------------
     async function preloadOfflineLine() {
-      showToast("⏳ Début du téléchargement du tracé ferroviaire (PK 0 à PK 704)...");
+      showToast("⏳ Début du téléchargement du tracé ferroviaire...");
       const tileUrls = [];
-      
       snimTrackPoints.forEach(pt => {
         const zoom = 9;
         const x = Math.floor((pt[1] + 180) / 360 * Math.pow(2, zoom));
@@ -996,14 +962,14 @@
       try {
         const cache = await caches.open('snim-pcd-v6-enterprise');
         await Promise.all(tileUrls.map(u => fetch(u).then(r => cache.put(u, r)).catch(()=>{})));
-        showToast("✅ Tuiles du réseau SNIM pré-enregistrées pour le désert !");
+        showToast("✅ Tuiles du réseau SNIM pré-enregistrées !");
       } catch(e) {
         showToast("⚠️ Échec du pré-chargement cartographique");
       }
     }
 
     // -----------------------------------------------------------------
-    // 8. CARTE ET RÉSEAU FERROVIAIRE
+    // 8. CARTE & TRAÇÉ SNIM
     // -----------------------------------------------------------------
     const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([21.3000, -14.5000], 7);
 
@@ -1032,7 +998,7 @@
     });
 
     // -----------------------------------------------------------------
-    // 9. GESTION UTILISATEUR & AUTHENTIFICATION SÉCURISÉE (OIDC/JWT)
+    // 9. AUTHENTIFICATION & UTILISATEUR
     // -----------------------------------------------------------------
     let currentUser = JSON.parse(sessionStorage.getItem('snim_token_session') || 'null');
     let soundEnabled = true;
@@ -1084,13 +1050,16 @@
       const badge = document.getElementById('userRoleBadge');
       const authBtn = document.getElementById('btnAuthToggle');
       const roleTitle = document.getElementById('panelRoleTitle');
+      const authModal = document.getElementById('authModal');
       
       if (currentUser && currentUser.token) {
         badge.innerText = `${currentUser.matricule} (${currentUser.role})`;
         document.getElementById('repDriver').value = `${currentUser.matricule} - ${currentUser.role}`;
         authBtn.innerText = "🔓 DÉCONNEXION";
         authBtn.style.background = "#dc2626";
-        document.getElementById('authModal').style.setProperty('display', 'none', 'important');
+        
+        // Fermeture de la modale d'authentification
+        authModal.classList.remove('active-modal');
 
         await securityManager.initSessionKey(currentUser.token);
 
@@ -1105,11 +1074,15 @@
         badge.innerText = "NON CONNECTÉ";
         authBtn.innerText = "🔑 AGENT";
         authBtn.style.background = "#334155";
-        document.getElementById('authModal').style.setProperty('display', 'flex', 'important');
+        
+        // Ouverture forcée de la modale si non connecté
+        authModal.classList.add('active-modal');
       }
     }
 
-    function openAuthModal() { document.getElementById('authModal').style.setProperty('display', 'flex', 'important'); }
+    function openAuthModal() { 
+      document.getElementById('authModal').classList.add('active-modal'); 
+    }
 
     function handleAuthButtonClick() {
       if (currentUser) {
@@ -1117,7 +1090,9 @@
         sessionStorage.removeItem('snim_token_session');
         showToast("🔒 Jeton d'accès révoqué. Session fermée.");
         updateUIForUser();
-      } else { openAuthModal(); }
+      } else { 
+        openAuthModal(); 
+      }
     }
 
     async function handleAuth(e) {
@@ -1130,7 +1105,7 @@
       
       sessionStorage.setItem('snim_token_session', JSON.stringify(currentUser));
       await updateUIForUser();
-      showToast(`🔑 Jetons JWT/OIDC validé : Agent ${matricule}`);
+      showToast(`🔑 Jetons JWT validés pour ${matricule}`);
     }
 
     function toggleAudio() {
@@ -1168,7 +1143,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 10. TEST DE REGULATION ET RESOLUTION DE CONFLITS SYNCHRONE
+    // 10. SIMULATION TEST RÉGULATION
     // -----------------------------------------------------------------
     function simulateDispatchOrder() {
       const orders = [
@@ -1177,14 +1152,12 @@
         { origin: "PCD Nouadhibou Central", instruction: "Arrêt d'urgence - Inspection rail chaud", sector: "PK 650", speed: "0 km/h (HALTE)", timestamp: Date.now() }
       ];
       const randomOrder = orders[Math.floor(Math.random() * orders.length)];
-      
-      // Passage par le moteur CRDT multi-agent
       conflictResolver.processIncomingOrder(randomOrder);
     }
 
     function acknowledgeDispatchOrder() {
-      document.getElementById('dispatchModal').style.display = 'none';
-      showToast("✅ Ordre de régulation acquitté & synchronisé dans la file d'ordres");
+      document.getElementById('dispatchModal').classList.remove('active-modal');
+      showToast("✅ Ordre de régulation acquitté & enregistré");
     }
 
     // -----------------------------------------------------------------
@@ -1196,7 +1169,6 @@
 
       if (realGPSActive) {
         btn.classList.add('btn-active');
-
         if (navigator.geolocation) {
           gpsWatchId = navigator.geolocation.watchPosition(
             pos => {
@@ -1204,11 +1176,11 @@
               if (!userMarker) {
                 userMarker = L.marker([latitude, longitude], {
                   icon: L.divIcon({ html: '🛰️', className: 'train-icon', iconSize: [28,28] })
-                }).addTo(map).bindPopup("<b>Position Réelle Vôtre / Convoi</b>");
+                }).addTo(map).bindPopup("<b>Votre position GPS en temps réel</b>");
               } else { userMarker.setLatLng([latitude, longitude]); }
               map.flyTo([latitude, longitude], 12);
             },
-            err => { showToast("⚠️ Signal GPS faible en cabine"); },
+            err => { showToast("⚠️ Signal GPS faible"); },
             { enableHighAccuracy: true }
           );
         }
@@ -1220,7 +1192,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 12. SYNCHRONISATION ET SIGNALEMENT MULTI-CANAL
+    // 12. RAPPORTS ET SIGNALEMENTS
     // -----------------------------------------------------------------
     function filterReports(sev) {
       currentFilter = sev;
@@ -1280,13 +1252,15 @@
     function openReportModal() {
       if (!currentUser) {
         openAuthModal();
-        showToast("⚠️ Authentification obligatoire pour émettre un rapport.");
+        showToast("⚠️ Authentification requise.");
         return;
       }
-      document.getElementById('reportModal').style.display = 'flex';
+      document.getElementById('reportModal').classList.add('active-modal');
     }
 
-    function closeReportModal() { document.getElementById('reportModal').style.display = 'none'; }
+    function closeReportModal() { 
+      document.getElementById('reportModal').classList.remove('active-modal'); 
+    }
 
     async function syncOfflineReports() {
       if (!navigator.onLine || !supabaseClient) return;
@@ -1297,9 +1271,7 @@
       for (let r of unsynced) {
         try {
           const sent = await networkManager.transmit(r);
-          if (sent) {
-            await localDB.markSynced(r.id);
-          }
+          if (sent) await localDB.markSynced(r.id);
         } catch(e) {}
       }
       renderReports();
@@ -1316,16 +1288,13 @@
 
       const newReport = { pk, type, severity, details, driver, time: `Aujourd'hui à ${nowTime}`, synced: false };
 
-      // Chiffrement AES-256 & stockage IndexedDB
       await localDB.saveReport(newReport);
-
-      // Envoi multi-canal hybride
       const transmitted = await networkManager.transmit(newReport);
 
       if (transmitted) {
-        showToast("⚡ Transmis via 4G LTE au serveur Central !");
+        showToast("⚡ Transmis via 4G LTE !");
       } else {
-        showToast("🔒 Sauvegardé sous AES-256 localement (Basculement Sat/LoRaWAN)");
+        showToast("🔒 Sauvegardé localement (Chiffrement AES-256)");
       }
 
       renderReports();
@@ -1342,7 +1311,7 @@
     }
 
     // -----------------------------------------------------------------
-    // 13. SIMULATION FLOTTE & BUS CAN EN DIRECT (SI MQTT OFF)
+    // 13. ZONES DE MAINTENANCE & SIMULATION DE TRAINS
     // -----------------------------------------------------------------
     function toggleHeatmap() {
       heatmapActive = !heatmapActive;
@@ -1377,7 +1346,6 @@
     });
 
     function updatePositions() {
-      // Mises à jour en mode simulation uniquement si pas de flux MQTT direct
       if (!mqttBridge.isConnected) {
         const dynamicSpeed = 45 + Math.floor(Math.random() * 8);
         const dynamicRpm = 1750 + Math.floor(Math.random() * 200);
